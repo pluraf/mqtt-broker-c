@@ -90,6 +90,14 @@ if (INC_BRIDGE_SUPPORT)
 endif (INC_BRIDGE_SUPPORT)
 
 
+option(INC_RESTAPI "Include REST API?" ON)
+if (INC_RESTAPI)
+	set (MOSQ_SRCS ${MOSQ_SRCS} ../civetweb/civetweb.c ./rest_api.c)
+	add_definitions("-DWITH_RESTAPI")
+	set_source_files_properties(../civetweb/civetweb.c PROPERTIES COMPILE_FLAGS "-DNO_SSL_DL -DOPENSSL_API_3_0")
+endif (INC_RESTAPI)
+
+
 option(USE_LIBWRAP
 	"Include tcp-wrappers support?" OFF)
 

@@ -56,6 +56,9 @@ Contributors:
 #include "misc_mosq.h"
 #include "util_mosq.h"
 
+#include "rest_api.h"
+
+
 struct mosquitto_db db;
 
 static struct mosquitto__listener_sock *listensock = NULL;
@@ -572,10 +575,15 @@ int main(int argc, char *argv[])
 	sd_notify(0, "READY=1");
 #endif
 
+
+	struct mg_context * mg_ctx = start_server();
+
 	run = 1;
 	rc = mosquitto_main_loop(listensock, listensock_count);
 
 	log__printf(NULL, MOSQ_LOG_INFO, "mosquitto version %s terminating", VERSION);
+
+	stop_server(mg_ctx);
 
 	/* FIXME - this isn't quite right, all wills with will delay zero should be
 	 * sent now, but those with positive will delay should be persisted and
