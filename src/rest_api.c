@@ -15,6 +15,31 @@ static int handler(struct mg_connection *conn, void *ignored)
 	return 200; /* HTTP state 200 = OK */
 }
 
+typedef enum {
+    MQTT_AUTH_PASSWORD,
+    MQTT_AUTH_JWT_ES256,
+    MQTT_AUTH_JWT_RS256,
+    MQTT_AUTH_INVALID
+} mqtt_auth_t;
+
+typedef struct {
+    char *name;
+    char *client_id;
+    mqtt_auth_t *auth_type;
+    char *password;
+}node_t;
+
+static int node_handler(struct mg_connection *conn, void *ignored)
+{
+    node_t node;
+
+    mg_get_var(conn, "node name", node.name, sizeof(node.name));
+    mg_get_var(conn, "auth_type", node.auth_type, sizeof(node.auth_type));
+    mg_get_var(conn, "password", node.password, sizeof(node.password));
+
+    return 200;
+}
+
 
 struct mg_context * start_server()
 {
