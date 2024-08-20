@@ -37,19 +37,19 @@ typedef struct {
     bool is_active;
 }user_t;
 
+//Will be changed with read db
 typedef struct {
     node_t node;
     struct node_pseudo_db_t *new_node;
 }node_pseudo_db_t;
 
 node_pseudo_db_t *p_node_db;
-user_t current_user = {1, 1, "active_user"};
 
-node_t *get_node_by_nodename(const char *node_name, int user_id) 
+node_t *get_node_by_nodename(const char *node_name, char client_id) 
 {
     node_pseudo_db_t *current = p_node_db;
     while (current != NULL) {
-        if (strcmp(current->node.name, node_name) == 0 && current->node.client_id == user_id) {
+        if (strcmp(current->node.name, node_name) == 0 && current->node.client_id == client_id) {
             return &current->node;
         }
         current = current->new_node;
@@ -57,28 +57,16 @@ node_t *get_node_by_nodename(const char *node_name, int user_id)
     return NULL;
 }
 
-node_t *get_node_by_node_id_for_user(const char *node_id, int user_id) 
-{
-    node_pseudo_db_t *current = p_node_db;
-    while (current != NULL) {
-        if (strcmp(current->node.id, node_id) == 0 && current->node.client_id == user_id) {
-            return &current->node;
-        }
-        current = current->new_node;
-    }
-    return NULL;
-}
-
-node_t *create_node(const char *node_name, const char *node_id, int user_id) 
+node_t *create_node(const char *node_name, const char *node_id, char client_id) 
 {
     node_pseudo_db_t *new_entry = (node_pseudo_db_t *)malloc(sizeof(node_pseudo_db_t));
     if (!new_entry) {
-        return NULL;  // Memory allocation failed
+        return NULL; 
     }
 
     strcpy(new_entry->node.name, node_name);
     strcpy(new_entry->node.id, node_id);
-    new_entry->node.client_id = user_id;
+    new_entry->node.client_id = client_id;
     new_entry->new_node = p_node_db;
     p_node_db = new_entry;
 
@@ -91,6 +79,7 @@ static int node_create_handler(struct mg_connection *conn, void *ignored)
     user_t user;
     node_pseudo_db_t *new_node;
     char post_data;
+    user_t current_user = {1, 1, "active_user"};
 
     int data_len = mg_read(conn, post_data, sizeof(post_data));
 
@@ -160,7 +149,7 @@ struct mg_context * start_server()
 
     /* Add some handler */
     mg_set_request_handler(ctx, "/hello", handler, "Hello world");
-    mg_set_request_handler(ctx, "user/create", node_create_handler, NULL);
+    mg_set_request_handler(ctx, "/user/create", node_create_handler, NULL);
 
     return ctx;
 
