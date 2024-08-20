@@ -1,6 +1,7 @@
 #include <string.h>
 
 #include "civetweb/civetweb.h"
+#include <stdbool.h>
 
 
 static int handler(struct mg_connection *conn, void *ignored)
@@ -27,15 +28,120 @@ typedef struct {
     char *client_id;
     mqtt_auth_t *auth_type;
     char *password;
+    char id;
 }node_t;
 
-static int node_handler(struct mg_connection *conn, void *ignored)
+typedef struct {
+    char name;
+    char id;
+    bool is_active;
+}user_t;
+
+typedef struct {
+    node_t node;
+    struct node_pseudo_db_t *new_node;
+}node_pseudo_db_t;
+
+node_pseudo_db_t *p_node_db;
+user_t current_user = {1, 1, "active_user"};
+
+node_t *get_node_by_nodename(const char *node_name, int user_id) 
+{
+    node_pseudo_db_t *current = p_node_db;
+    while (current != NULL) {
+        if (strcmp(current->node.name, node_name) == 0 && current->node.client_id == user_id) {
+            return &current->node;
+        }
+        current = current->new_node;
+    }
+    return NULL;
+}
+
+node_t *get_node_by_node_id_for_user(const char *node_id, int user_id) 
+{
+    node_pseudo_db_t *current = p_node_db;
+    while (current != NULL) {
+        if (strcmp(current->node.id, node_id) == 0 && current->node.client_id == user_id) {
+            return &current->node;
+        }
+        current = current->new_node;
+    }
+    return NULL;
+}
+
+node_t *create_node(const char *node_name, const char *node_id, int user_id) 
+{
+    node_pseudo_db_t *new_entry = (node_pseudo_db_t *)malloc(sizeof(node_pseudo_db_t));
+    if (!new_entry) {
+        return NULL;  // Memory allocation failed
+    }
+
+    strcpy(new_entry->node.name, node_name);
+    strcpy(new_entry->node.id, node_id);
+    new_entry->node.client_id = user_id;
+    new_entry->new_node = p_node_db;
+    p_node_db = new_entry;
+
+    return &new_entry->node;
+}
+
+static int node_create_handler(struct mg_connection *conn, void *ignored)
 {
     node_t node;
+    user_t user;
+    node_pseudo_db_t *new_node;
+    char post_data;
 
-    mg_get_var(conn, "node name", node.name, sizeof(node.name));
-    mg_get_var(conn, "auth_type", node.auth_type, sizeof(node.auth_type));
-    mg_get_var(conn, "password", node.password, sizeof(node.password));
+    int data_len = mg_read(conn, post_data, sizeof(post_data));
+
+    if(data_len <= 0){
+        mg_printf(conn,
+                "HTTP/1.1 400 Bad Request\r\n"
+                "Content-Type: text/plain\r\n"
+                "Connection: close\r\n\r\n"
+                "Failed to read data\n");
+        return 400;
+    }
+
+    mg_get_var(post_data, data_len, "node name", node.name, sizeof(node.name));
+    mg_get_var(post_data, data_len, "auth_type", node.auth_type, sizeof(node.auth_type));
+    mg_get_var(post_data, data_len, "password", node.password, sizeof(node.password));
+    mg_get_var(post_data, data_len, "node_id", node.id, sizeof(node.id));
+
+    if(!user.is_active){
+        mg_printf(conn,
+                "HTTP/1.1 400 Bad Request\r\n"
+                "Content-Type: text/plain\r\n"
+                "Connection: close\r\n\r\n"
+                "Only active users are authorized\n");
+        return 400;
+    }
+
+    new_node = get_node_by_nodename(node.name, current_user.id);
+    if(p_node_db != NULL){
+        mg_printf(conn,
+                "HTTP/1.1 400 Bad Request\r\n"
+                "Content-Type: text/plain\r\n"
+                "Connection: close\r\n\r\n"
+                "Node id already registered\n");
+        return 400;
+    }
+
+    new_node = create_node(node.name, node.id, current_user.id);
+    if (new_node == NULL) {
+        mg_printf(conn,
+                "HTTP/1.1 400 Bad Request\r\n"
+                "Content-Type: text/plain\r\n"
+                "Connection: close\r\n\r\n"
+                "Invalid registry id\n");
+        return 400;
+    }
+
+    mg_printf(conn,
+            "HTTP/1.1 200 OK\r\n"
+            "Content-Type: text/plain\r\n"
+            "Connection: close\r\n\r\n"
+            "Node created successfully\n");
 
     return 200;
 }
@@ -54,6 +160,7 @@ struct mg_context * start_server()
 
     /* Add some handler */
     mg_set_request_handler(ctx, "/hello", handler, "Hello world");
+    mg_set_request_handler(ctx, "user/create", node_create_handler, NULL);
 
     return ctx;
 
