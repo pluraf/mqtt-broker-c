@@ -1,2 +1,12 @@
-This project is dual licensed under the Eclipse Public License 2.0 and the
+The original project forked from https://github.com/eclipse/mosquitto
+was dual licensed under the Eclipse Public License 2.0 and the
 Eclipse Distribution License 1.0 as described in the epl-v20 and edl-v10 files.
+
+The source code of the original project was taken under the conditions of
+Eclipse Distribution License 1.0 as described in the edl-v10.
+
+The content added after the fork is the property of Pluraf Embedded AB.
+Copyright (c) 2024 Pluraf Embedded AB <code@pluraf.com>
+
+This project (MQTT Broker C) is made available under BSD 3 Clause license.
+SPDX-License-Identifier: BSD-3-Clause
