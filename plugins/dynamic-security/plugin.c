@@ -249,7 +249,7 @@ void dynsec__command_reply(cJSON *j_responses, struct mosquitto *context, const 
 }
 
 
-static void send_response(cJSON *tree)
+static void send_response(cJSON *tree, char ** response)
 {
 	char *payload;
 	size_t payload_len;
@@ -263,8 +263,13 @@ static void send_response(cJSON *tree)
 		free(payload);
 		return;
 	}
-	mosquitto_broker_publish(NULL, "$CONTROL/dynamic-security/v1/response",
-			(int)payload_len, payload, 0, 0, NULL);
+
+	if(response != NULL){
+		*response = payload;
+	} else {
+		mosquitto_broker_publish(NULL, "$CONTROL/dynamic-security/v1/response",
+				(int)payload_len, payload, 0, 0, NULL);
+	}
 }
 
 
@@ -275,7 +280,6 @@ static int dynsec_control_callback(int event, void *event_data, void *userdata)
 	cJSON *j_response_tree, *j_responses;
 
 	UNUSED(event);
-	UNUSED(userdata);
 
 	/* Create object for responses */
 	j_response_tree = cJSON_CreateObject();
@@ -301,14 +305,14 @@ static int dynsec_control_callback(int event, void *event_data, void *userdata)
 #endif
 	if(tree == NULL){
 		dynsec__command_reply(j_responses, ed->client, "Unknown command", "Payload not valid JSON", NULL);
-		send_response(j_response_tree);
+		send_response(j_response_tree, userdata);
 		return MOSQ_ERR_SUCCESS;
 	}
 	commands = cJSON_GetObjectItem(tree, "commands");
 	if(commands == NULL || !cJSON_IsArray(commands)){
 		cJSON_Delete(tree);
 		dynsec__command_reply(j_responses, ed->client, "Unknown command", "Invalid/missing commands", NULL);
-		send_response(j_response_tree);
+		send_response(j_response_tree, userdata);
 		return MOSQ_ERR_SUCCESS;
 	}
 
@@ -316,7 +320,7 @@ static int dynsec_control_callback(int event, void *event_data, void *userdata)
 	dynsec__handle_control(j_responses, ed->client, commands);
 	cJSON_Delete(tree);
 
-	send_response(j_response_tree);
+	send_response(j_response_tree, userdata);
 
 	return MOSQ_ERR_SUCCESS;
 }

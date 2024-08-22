@@ -36,27 +36,60 @@ Contributors:
 */
 
 
-#include <string.h>
-
 #include "civetweb/civetweb.h"
+
+#include "uthash.h"
+
+#include "mosquitto_broker.h"
+#include "mosquitto_broker_internal.h"
+
+#include <string.h>
 
 
 static int handler(struct mg_connection * conn, void * ignored)
 {
-	const char *msg = "Hello world !";
-	unsigned long len = (unsigned long)strlen(msg);
+    char *response;
+    uint8_t buf[1024] = {0};
 
-	mg_send_http_ok(conn, "text/plain", len);
+    mg_read(conn, buf, sizeof(buf));  // TODO: Read until 0 or -1
 
-	mg_write(conn, msg, len);
+    struct mosquitto__callback *cb_found;
+    struct mosquitto_evt_control event_data;
+    struct mosquitto__security_options *opts = &db.config->security_options;
+    mosquitto_property *properties = NULL;
 
-	return 200; /* HTTP state 200 = OK */
+    const char * topic = "$CONTROL/dynamic-security/v1";
+    HASH_FIND(hh, opts->plugin_callbacks.control, topic, strlen(topic), cb_found);
+    if(cb_found){
+        memset(&event_data, 0, sizeof(event_data));
+        event_data.client = NULL;
+        event_data.topic = topic;
+        event_data.payload = buf;
+        event_data.payloadlen = strlen(buf);
+        event_data.qos = 0;
+        event_data.retain = 0;
+        event_data.properties = NULL;
+        event_data.reason_code = 0;
+        event_data.reason_string = NULL;
+
+        int rc = cb_found->cb(MOSQ_EVT_CONTROL, &event_data, &response);
+        free(event_data.reason_string);
+    }
+
+    unsigned long len = (unsigned long)strlen(response);
+
+    mg_send_http_ok(conn, "application/json", len);
+
+    mg_write(conn, response, len);
+    free(response);
+
+    return 200;  // HTTP state 200 = OK
 }
 
 
 int auth_handler(struct mg_connection * conn, void * cbdata)
 {
-    int authorized = 0;
+    int authorized = 1;
 
     char * auth_token = mg_get_header(conn, "Authorization");
     if(auth_token != NULL){
@@ -76,22 +109,15 @@ int auth_handler(struct mg_connection * conn, void * cbdata)
 
 struct mg_context * start_server()
 {
-    /* Server context handle */
     struct mg_context *ctx;
 
-    /* Initialize the library */
     mg_init_library(0);
-
-    /* Start the server */
     ctx = mg_start(NULL, 0, NULL);
 
-    /* Add some handler */
-    mg_set_request_handler(ctx, "/home", handler, "Hello world");
-
+    mg_set_request_handler(ctx, "/command$", handler, NULL);
     mg_set_auth_handler(ctx, "/**", auth_handler, NULL);
 
     return ctx;
-
 }
 
 
