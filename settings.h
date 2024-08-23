@@ -1,0 +1,8 @@
+//#define WITH_BROKER 1
+#define WITH_TLS 1
+#define WITH_TLS_PSK 1
+#define WITH_THREADING 1
+#define WITH_PERSISTENCE 1
+//#define WITH_WEBSOCKETS 1
+#define WITH_CJSON 1
+#define WITH_CONTROL 1

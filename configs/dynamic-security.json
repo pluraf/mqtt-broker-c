@@ -1,0 +1,87 @@
+{
+	"defaultACLAccess":	{
+		"publishClientSend":	false,
+		"publishClientReceive":	true,
+		"subscribe":	false,
+		"unsubscribe":	true
+	},
+	"clients":	[{
+			"username":	"admin",
+			"textname":	"Dynsec admin user",
+			"roles":	[{
+					"rolename":	"admin"
+				}],
+			"password":	"B/RHrnYXDcR3BInoSUVm2d/PgkFUQ6nJ4k2xOAXHxBfVwhawcsc8bwDBDQVVfv9N/KtB+nlrkEYT5m5Zn/Z7Hg==",
+			"salt":	"H7sXuXHo4GUOVcLe",
+			"iterations":	101
+		}, {
+			"username":	"f",
+			"roles":	[]
+		}, {
+			"username":	"f1",
+			"roles":	[]
+		}],
+	"groups":	[{
+			"groupname":	"1",
+			"textname":	"",
+			"textdescription":	"",
+			"roles":	[{
+					"rolename":	"wer"
+				}],
+			"clients":	[]
+		}],
+	"roles":	[{
+			"rolename":	"admin",
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"$CONTROL/dynamic-security/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientReceive",
+					"topic":	"$CONTROL/dynamic-security/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientReceive",
+					"topic":	"$SYS/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientReceive",
+					"topic":	"#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"$CONTROL/dynamic-security/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"$SYS/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"unsubscribePattern",
+					"topic":	"#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"wer",
+			"textname":	"",
+			"textdescription":	"",
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"fsd",
+					"priority":	0,
+					"allow":	true
+				}]
+		}]
+}
