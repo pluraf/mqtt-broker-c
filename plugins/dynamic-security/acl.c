@@ -167,13 +167,15 @@ static int acl_check(struct mosquitto_evt_acl_check *ed, MOSQ_FUNC_acl_check che
 {
 	struct dynsec__client *client;
 	struct dynsec__grouplist *grouplist, *grouplist_tmp = NULL;
-	const char *username;
+	const char * username;
+	const char * clientid;
 	int rc;
 
 	username = mosquitto_client_username(ed->client);
+	clientid = mosquitto_client_clientid(ed->client);
 
-	if(username){
-		client = dynsec_clients__find(username);
+	if(clientid || username){
+		client = dynsec_clients__find(clientid, username);
 		if(client == NULL) return MOSQ_ERR_PLUGIN_DEFER;
 
 		/* Client roles */

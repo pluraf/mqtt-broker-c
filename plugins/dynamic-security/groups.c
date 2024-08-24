@@ -1,20 +1,54 @@
-/*
+/* SPDX-License-Identifier: BSD-3-Clause */
+
+/******************************************************************************
 Copyright (c) 2020 Roger Light <roger@atchoo.org>
 
 All rights reserved. This program and the accompanying materials
-are made available under the terms of the Eclipse Public License 2.0
-and Eclipse Distribution License v1.0 which accompany this distribution.
+are made available under the terms of Eclipse Distribution License v1.0
+which accompany this distribution.
 
-The Eclipse Public License is available at
-   https://www.eclipse.org/legal/epl-2.0/
-and the Eclipse Distribution License is available at
-  http://www.eclipse.org/org/documents/edl-v10.php.
-
-SPDX-License-Identifier: EPL-2.0 OR BSD-3-Clause
+The Eclipse Distribution License is available at
+  http://www.eclipse.org/org/documents/edl-v10.php
 
 Contributors:
    Roger Light - initial implementation and documentation.
-*/
+
+******************************************************************************/
+
+/******************************************************************************
+Copyright (c) 2024 Pluraf Embedded AB <code@pluraf.com>
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice,
+this list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright notice,
+this list of conditions and the following disclaimer in the documentation
+and/or other materials provided with the distribution.
+
+3. Neither the name of the copyright holder nor the names of its contributors
+may be used to endorse or promote products derived from this software without
+specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS “AS IS”
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS
+BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
+GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+===============================================================================
+
+Contributors:
+   Konstantin Tyurin <konstantin@pluraf.com>
+
+******************************************************************************/
 
 #include "config.h"
 
@@ -285,11 +319,11 @@ int dynsec_groups__config_load(cJSON *tree)
 			if(j_clientlist && cJSON_IsArray(j_clientlist)){
 				cJSON_ArrayForEach(j_client, j_clientlist){
 					if(cJSON_IsObject(j_client)){
-						char *username;
-						json_get_string(j_client, "username", &username, false);
-						if(username){
+						char *connid;
+						if (json_get_string(j_client, "connid", &connid, false) == MOSQ_ERR_SUCCESS){
 							json_get_int(j_client, "priority", &priority, true, -1);
-							dynsec_groups__add_client(username, group->groupname, priority, false);
+							struct dynsec__client * client = dynsec_clients__get(connid);
+							if(client) dynsec_groups__add_client(client, group->groupname, priority, false);
 						}
 					}
 				}
@@ -500,14 +534,12 @@ int dynsec_groups__process_delete(cJSON *j_responses, struct mosquitto *context,
 }
 
 
-int dynsec_groups__add_client(const char *username, const char *groupname, int priority, bool update_config)
+int dynsec_groups__add_client(struct dynsec__client * client, const char *groupname, int priority, bool update_config)
 {
-	struct dynsec__client *client;
 	struct dynsec__clientlist *clientlist;
 	struct dynsec__group *group;
 	int rc;
 
-	client = dynsec_clients__find(username);
 	if(client == NULL){
 		return ERR_USER_NOT_FOUND;
 	}
@@ -517,7 +549,7 @@ int dynsec_groups__add_client(const char *username, const char *groupname, int p
 		return ERR_GROUP_NOT_FOUND;
 	}
 
-	HASH_FIND(hh, group->clientlist, username, strlen(username), clientlist);
+	HASH_FIND(hh, group->clientlist, client->connid, strlen(client->connid), clientlist);
 	if(clientlist != NULL){
 		/* Client is already in the group */
 		return MOSQ_ERR_ALREADY_EXISTS;
@@ -543,17 +575,17 @@ int dynsec_groups__add_client(const char *username, const char *groupname, int p
 
 int dynsec_groups__process_add_client(cJSON *j_responses, struct mosquitto *context, cJSON *command, char *correlation_data)
 {
-	char *username, *groupname;
+	char *connid, *groupname;
 	int rc;
 	int priority;
 	const char *admin_clientid, *admin_username;
 
-	if(json_get_string(command, "username", &username, false) != MOSQ_ERR_SUCCESS){
-		dynsec__command_reply(j_responses, context, "addGroupClient", "Invalid/missing username", correlation_data);
+	if(json_get_string(command, "connid", &connid, false) != MOSQ_ERR_SUCCESS){
+		dynsec__command_reply(j_responses, context, "addGroupClient", "Invalid/missing connid", correlation_data);
 		return MOSQ_ERR_INVAL;
 	}
-	if(mosquitto_validate_utf8(username, (int)strlen(username)) != MOSQ_ERR_SUCCESS){
-		dynsec__command_reply(j_responses, context, "addGroupClient", "Username not valid UTF-8", correlation_data);
+	if(mosquitto_validate_utf8(connid, (int)strlen(connid)) != MOSQ_ERR_SUCCESS){
+		dynsec__command_reply(j_responses, context, "addGroupClient", "connid not valid UTF-8", correlation_data);
 		return MOSQ_ERR_INVAL;
 	}
 
@@ -568,26 +600,33 @@ int dynsec_groups__process_add_client(cJSON *j_responses, struct mosquitto *cont
 
 	json_get_int(command, "priority", &priority, true, -1);
 
-	rc = dynsec_groups__add_client(username, groupname, priority, true);
-	if(rc == MOSQ_ERR_SUCCESS){
-		admin_clientid = mosquitto_client_id(context);
-		admin_username = mosquitto_client_username(context);
-		mosquitto_log_printf(MOSQ_LOG_INFO, "dynsec: %s/%s | addGroupClient | groupname=%s | username=%s | priority=%d",
-				admin_clientid, admin_username, groupname, username, priority);
-
-		dynsec__command_reply(j_responses, context, "addGroupClient", NULL, correlation_data);
-	}else if(rc == ERR_USER_NOT_FOUND){
+	struct dynsec__client * client = dynsec_clients__get(connid);
+	if(client == NULL){
 		dynsec__command_reply(j_responses, context, "addGroupClient", "Client not found", correlation_data);
-	}else if(rc == ERR_GROUP_NOT_FOUND){
-		dynsec__command_reply(j_responses, context, "addGroupClient", "Group not found", correlation_data);
-	}else if(rc == MOSQ_ERR_ALREADY_EXISTS){
-		dynsec__command_reply(j_responses, context, "addGroupClient", "Client is already in this group", correlation_data);
 	}else{
-		dynsec__command_reply(j_responses, context, "addGroupClient", "Internal error", correlation_data);
+		rc = dynsec_groups__add_client(client, groupname, priority, true);
+		if(rc == MOSQ_ERR_SUCCESS){
+			admin_clientid = mosquitto_client_id(context);
+			admin_username = mosquitto_client_username(context);
+			mosquitto_log_printf(MOSQ_LOG_INFO, "dynsec: %s/%s | addGroupClient | groupname=%s | connid=%s | priority=%d",
+					admin_clientid, admin_username, groupname, connid, priority);
+
+			dynsec__command_reply(j_responses, context, "addGroupClient", NULL, correlation_data);
+		}else if(rc == ERR_GROUP_NOT_FOUND){
+			dynsec__command_reply(j_responses, context, "addGroupClient", "Group not found", correlation_data);
+		}else if(rc == MOSQ_ERR_ALREADY_EXISTS){
+			dynsec__command_reply(j_responses, context, "addGroupClient", "Client is already in this group", correlation_data);
+		}else{
+			dynsec__command_reply(j_responses, context, "addGroupClient", "Internal error", correlation_data);
+		}
 	}
 
 	/* Enforce any changes */
-	mosquitto_kick_client_by_username(username, false);
+	if (client->clientid) {
+		mosquitto_kick_client_by_clientid(client->clientid, false);
+	}else{
+		mosquitto_kick_client_by_username(client->username, false);
+	}
 
 	return rc;
 }
@@ -619,12 +658,12 @@ static int dynsec__remove_all_roles_from_group(struct dynsec__group *group)
 	return MOSQ_ERR_SUCCESS;
 }
 
-int dynsec_groups__remove_client(const char *username, const char *groupname, bool update_config)
+int dynsec_groups__remove_client(const char *connid, const char *groupname, bool update_config)
 {
 	struct dynsec__client *client;
 	struct dynsec__group *group;
 
-	client = dynsec_clients__find(username);
+	client = dynsec_clients__get(connid);
 	if(client == NULL){
 		return ERR_USER_NOT_FOUND;
 	}
@@ -645,16 +684,16 @@ int dynsec_groups__remove_client(const char *username, const char *groupname, bo
 
 int dynsec_groups__process_remove_client(cJSON *j_responses, struct mosquitto *context, cJSON *command, char *correlation_data)
 {
-	char *username, *groupname;
+	char *connid, *groupname;
 	int rc;
 	const char *admin_clientid, *admin_username;
 
-	if(json_get_string(command, "username", &username, false) != MOSQ_ERR_SUCCESS){
-		dynsec__command_reply(j_responses, context, "removeGroupClient", "Invalid/missing username", correlation_data);
+	if(json_get_string(command, "connid", &connid, false) != MOSQ_ERR_SUCCESS){
+		dynsec__command_reply(j_responses, context, "removeGroupClient", "Invalid/missing connid", correlation_data);
 		return MOSQ_ERR_INVAL;
 	}
-	if(mosquitto_validate_utf8(username, (int)strlen(username)) != MOSQ_ERR_SUCCESS){
-		dynsec__command_reply(j_responses, context, "removeGroupClient", "Username not valid UTF-8", correlation_data);
+	if(mosquitto_validate_utf8(connid, (int)strlen(connid)) != MOSQ_ERR_SUCCESS){
+		dynsec__command_reply(j_responses, context, "removeGroupClient", "connid not valid UTF-8", correlation_data);
 		return MOSQ_ERR_INVAL;
 	}
 
@@ -667,12 +706,12 @@ int dynsec_groups__process_remove_client(cJSON *j_responses, struct mosquitto *c
 		return MOSQ_ERR_INVAL;
 	}
 
-	rc = dynsec_groups__remove_client(username, groupname, true);
+	rc = dynsec_groups__remove_client(connid, groupname, true);
 	if(rc == MOSQ_ERR_SUCCESS){
 		admin_clientid = mosquitto_client_id(context);
 		admin_username = mosquitto_client_username(context);
-		mosquitto_log_printf(MOSQ_LOG_INFO, "dynsec: %s/%s | removeGroupClient | groupname=%s | username=%s",
-				admin_clientid, admin_username, groupname, username);
+		mosquitto_log_printf(MOSQ_LOG_INFO, "dynsec: %s/%s | removeGroupClient | groupname=%s | connid=%s",
+				admin_clientid, admin_username, groupname, connid);
 
 		dynsec__command_reply(j_responses, context, "removeGroupClient", NULL, correlation_data);
 	}else if(rc == ERR_USER_NOT_FOUND){
@@ -684,7 +723,12 @@ int dynsec_groups__process_remove_client(cJSON *j_responses, struct mosquitto *c
 	}
 
 	/* Enforce any changes */
-	mosquitto_kick_client_by_username(username, false);
+	struct dynsec__client * conn = dynsec_clients__get(connid);
+	if (conn->clientid) {
+		mosquitto_kick_client_by_clientid(conn->clientid, false);
+	}else{
+		mosquitto_kick_client_by_username(conn->username, false);
+	}
 
 	return rc;
 }
@@ -718,12 +762,12 @@ static cJSON *add_group_to_json(struct dynsec__group *group)
 		}
 		cJSON_AddItemToArray(j_clientlist, j_client);
 
-		jtmp = cJSON_CreateStringReference(clientlist->client->username);
+		jtmp = cJSON_CreateStringReference(clientlist->client->connid);
 		if(jtmp == NULL){
 			cJSON_Delete(j_group);
 			return NULL;
 		}
-		cJSON_AddItemToObject(j_client, "username", jtmp);
+		cJSON_AddItemToObject(j_client, "connid", jtmp);
 	}
 
 	j_rolelist = dynsec_rolelist__all_to_json(group->rolelist);
@@ -933,7 +977,7 @@ int dynsec_groups__process_modify(cJSON *j_responses, struct mosquitto *context,
 	int rc;
 	int priority;
 	cJSON *j_client, *j_clients;
-	char *username;
+	char *connid;
 	char *textname;
 	char *textdescription;
 	const char *admin_clientid, *admin_username;
@@ -999,16 +1043,15 @@ int dynsec_groups__process_modify(cJSON *j_responses, struct mosquitto *context,
 		/* Iterate over array to check clients are valid before proceeding */
 		cJSON_ArrayForEach(j_client, j_clients){
 			if(cJSON_IsObject(j_client)){
-				json_get_string(j_client, "username", &username, false);
-				if(username){
-					client = dynsec_clients__find(username);
+				if(json_get_string(j_client, "connid", &connid, false) == MOSQ_ERR_SUCCESS){
+					client = dynsec_clients__get(connid);
 					if(client == NULL){
-						dynsec__command_reply(j_responses, context, "modifyGroup", "'clients' contains an object with a 'username' that does not exist", correlation_data);
+						dynsec__command_reply(j_responses, context, "modifyGroup", "'clients' contains an object with a 'connid' that does not exist", correlation_data);
 						rc = MOSQ_ERR_INVAL;
 						goto error;
 					}
 				}else{
-					dynsec__command_reply(j_responses, context, "modifyGroup", "'clients' contains an object with an invalid 'username'", correlation_data);
+					dynsec__command_reply(j_responses, context, "modifyGroup", "'clients' contains an object with an invalid 'connid'", correlation_data);
 					rc = MOSQ_ERR_INVAL;
 					goto error;
 				}
@@ -1022,10 +1065,10 @@ int dynsec_groups__process_modify(cJSON *j_responses, struct mosquitto *context,
 		/* Now we can add the new clients to the group */
 		cJSON_ArrayForEach(j_client, j_clients){
 			if(cJSON_IsObject(j_client)){
-				json_get_string(j_client, "username", &username, false);
-				if(username){
+				if (json_get_string(j_client, "connid", &connid, false) == MOSQ_ERR_SUCCESS){
 					json_get_int(j_client, "priority", &priority, true, -1);
-					dynsec_groups__add_client(username, groupname, priority, false);
+					client = dynsec_clients__get(connid);
+					if(client) dynsec_groups__add_client(client, groupname, priority, false);
 				}
 			}
 		}
