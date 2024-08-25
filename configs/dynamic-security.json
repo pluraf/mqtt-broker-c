@@ -8,8 +8,8 @@
     "clients": [
         {
             "connid": "connid1",
-            "clientid": "clientid",
             "username": "admin",
+            "authtype": "password",
             "textname": "Dynsec admin user",
             "roles": [{
                     "rolename": "admin"
@@ -18,12 +18,13 @@
                 "hash": "B/RHrnYXDcR3BInoSUVm2d/PgkFUQ6nJ4k2xOAXHxBfVwhawcsc8bwDBDQVVfv9N/KtB+nlrkEYT5m5Zn/Z7Hg==",
                 "salt": "H7sXuXHo4GUOVcLe",
                 "iterations": 101
-            },
-            "jwtkey": ""
+            }
         },
         {
             "connid": "cfsfs",
             "username": "f",
+            "authtype": "jwt_es256",
+            "jwtkey": "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAET1cbQ+piC3fCxfDdICJs3+iQmrzbSEkyc1gWpWqKGAq5Jf0x/tBofdSppTvuaA1+8F9Tf8xpwHUQNQIXbFD69A==\n-----END PUBLIC KEY-----",
             "roles": []
         },
         {

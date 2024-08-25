@@ -167,10 +167,15 @@ struct dynsec__client * dynsec_clients__find(const char *clientid, const char *u
 
 	if(clientid){
 		HASH_FIND(hh_clientid, local_clientid_clients, clientid, strlen(clientid), client);
-	}else if(username){
-		HASH_FIND(hh_username, local_username_clients, username, strlen(username), client);
+		if(client) return client;
 	}
-	return client;
+
+	if(username){
+		HASH_FIND(hh_username, local_username_clients, username, strlen(username), client);
+		if(client) return client;
+	}
+
+	return NULL;
 }
 
 struct dynsec__client *dynsec_clients__get(const char * connid)
@@ -271,18 +276,20 @@ int dynsec_clients__config_load(cJSON *tree)
 		if(cJSON_IsObject(j_client) == true){
 			// connid
 			char *connid;
- 			json_get_string(j_client, "connid", &connid, false);
-			if(! connid)continue;
+ 			if (json_get_string(j_client, "connid", &connid, false) != MOSQ_ERR_SUCCESS)continue;
+
+			char *authtype;
+			if (json_get_string(j_client, "authtype", &authtype, false) != MOSQ_ERR_SUCCESS)continue;
 
 			// username
 			char *username;
-			json_get_string(j_client, "username", &username, false);
+			json_get_string(j_client, "username", &username, true);
 
 			// clientid
 			char *clientid;
-			json_get_string(j_client, "clientid", &clientid, false);
+			json_get_string(j_client, "clientid", &clientid, true);
 
-			client = dynsec_clients__find(clientid, username);
+			client = dynsec_clients__get(connid);
 			if(client)continue;
 
 			// Create client
@@ -290,11 +297,13 @@ int dynsec_clients__config_load(cJSON *tree)
 			if(client == NULL){
 				return MOSQ_ERR_NOMEM;
 			}
+
 			client->connid = mosquitto_strdup(connid);
 			if(client->connid == NULL){
 				client__unallocate_item(client);
 				continue;
 			}
+
 			if(clientid){
 				client->clientid = mosquitto_strdup(clientid);
 				if(client->clientid == NULL){
@@ -302,6 +311,7 @@ int dynsec_clients__config_load(cJSON *tree)
 					continue;
 				}
 			}
+
 			if(username){
 				client->username = mosquitto_strdup(username);
 				if(client->username == NULL){
@@ -312,6 +322,13 @@ int dynsec_clients__config_load(cJSON *tree)
 
 			// Time to check for uniqueness
 			if(dynsec_clients__add(client) != MOSQ_ERR_SUCCESS){
+				client__unallocate_item(client);
+				continue;
+			}
+
+			// authtype
+			client->authtype = mosquitto_strdup(authtype);
+			if(client->authtype == NULL){
 				client__unallocate_item(client);
 				continue;
 			}
@@ -355,7 +372,7 @@ int dynsec_clients__config_load(cJSON *tree)
 
 			// JWT key
 			char * jwtkey;
-			if(json_get_string(j_client, "password", &jwtkey, true), jwtkey){
+			if(json_get_string(j_client, "jwtkey", &jwtkey, true), jwtkey){
 				client->jwtkey = mosquitto_strdup(jwtkey);
 				if(client->jwtkey == NULL){
 					client__unallocate_item(client);
@@ -400,7 +417,6 @@ int dynsec_clients__config_load(cJSON *tree)
 					}
 				}
 			}
-			printf("add: %s\n", client->connid);
 		}
 	}
 

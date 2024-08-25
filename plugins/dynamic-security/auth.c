@@ -61,6 +61,8 @@ Contributors:
 #include "dynamic_security.h"
 #include "mosquitto.h"
 #include "mosquitto_broker.h"
+#include "jwt/jwt.h"
+#include "jwt/jwt_helpers.h"
 
 
 /* ################################################################
@@ -209,7 +211,7 @@ static int memcmp_const(const void *a, const void *b, size_t len)
 int dynsec_auth__authenticate(const struct dynsec__client * client, const struct mosquitto_evt_basic_auth *ed)
 {
 	if(strcmp(client->authtype, MQTT_AUTH_PASSWORD) == 0){
-		unsigned char password_hash[64]; /* For SHA512 */
+		unsigned char password_hash[64];  // For SHA512
 		if(client->pw.valid && dynsec_auth__pw_hash(client, ed->password, password_hash, sizeof(password_hash), false) == MOSQ_ERR_SUCCESS){
 			if(memcmp_const(client->pw.password_hash, password_hash, sizeof(password_hash)) == 0){
 				return MOSQ_ERR_SUCCESS;
@@ -217,8 +219,14 @@ int dynsec_auth__authenticate(const struct dynsec__client * client, const struct
 				return MOSQ_ERR_AUTH;
 			}
 		}
-	}else if (strcmp(client->authtype, MQTT_AUTH_KEY_PREFIX) == 0) {
-		return MOSQ_ERR_SUCCESS;
+	}else if(strcmp(client->authtype, MQTT_AUTH_JWT_ES256) == 0){
+		point_t key;
+		int rc = public_key_from_pem(client->jwtkey, &key);
+		if(rc != 0){
+			mosquitto_log_printf(MOSQ_LOG_WARNING, "Can't load public key");
+			return MOSQ_ERR_AUTH;
+		}
+		if(jwt_verify(ed->password, &key) == 1) return MOSQ_ERR_SUCCESS;
 	}
 	return MOSQ_ERR_PLUGIN_DEFER;
 }

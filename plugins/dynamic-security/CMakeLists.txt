@@ -2,6 +2,7 @@ if (CJSON_FOUND AND WITH_TLS)
 	add_definitions("-DWITH_CJSON")
 
 	set( CLIENT_INC ${mosquitto_SOURCE_DIR} ${mosquitto_SOURCE_DIR}/include
+		${mosquitto_SOURCE_DIR}/jwt
 		${STDBOOL_H_PATH} ${STDINT_H_PATH} ${PTHREAD_INCLUDE_DIR}
 		${OPENSSL_INCLUDE_DIR} ${mosquitto_SOURCE_DIR}/deps
 		${mosquitto_SOURCE_DIR}/src
@@ -25,7 +26,16 @@ if (CJSON_FOUND AND WITH_TLS)
 		plugin.c
 		roles.c
 		rolelist.c
-		sub_matches_sub.c)
+		sub_matches_sub.c
+		../../jwt/jwt.c
+		../../jwt/jwt_helpers.c
+		../../jwt/crypto/ecc-light-certificate/ecdsa.c
+		../../jwt/crypto/ecc-light-certificate/ecc.c
+		../../jwt/crypto/ecc-light-certificate/nn.c
+		../../jwt/crypto/curve-params/secp256r1.c
+		../../jwt/crypto/sha2/sha2.c
+		../../jwt/base64/base64.c
+		)
 
 	set_target_properties(mosquitto_dynamic_security PROPERTIES
 		POSITION_INDEPENDENT_CODE 1
