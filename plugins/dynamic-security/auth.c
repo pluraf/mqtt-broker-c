@@ -1,20 +1,55 @@
-/*
+/* SPDX-License-Identifier: BSD-3-Clause */
+
+/******************************************************************************
 Copyright (c) 2020 Roger Light <roger@atchoo.org>
 
 All rights reserved. This program and the accompanying materials
-are made available under the terms of the Eclipse Public License 2.0
-and Eclipse Distribution License v1.0 which accompany this distribution.
+are made available under the terms of Eclipse Distribution License v1.0
+which accompany this distribution.
 
-The Eclipse Public License is available at
-   https://www.eclipse.org/legal/epl-2.0/
-and the Eclipse Distribution License is available at
-  http://www.eclipse.org/org/documents/edl-v10.php.
-
-SPDX-License-Identifier: EPL-2.0 OR BSD-3-Clause
+The Eclipse Distribution License is available at
+  http://www.eclipse.org/org/documents/edl-v10.php
 
 Contributors:
    Roger Light - initial implementation and documentation.
-*/
+
+******************************************************************************/
+
+/******************************************************************************
+Copyright (c) 2024 Pluraf Embedded AB <code@pluraf.com>
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice,
+this list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright notice,
+this list of conditions and the following disclaimer in the documentation
+and/or other materials provided with the distribution.
+
+3. Neither the name of the copyright holder nor the names of its contributors
+may be used to endorse or promote products derived from this software without
+specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS “AS IS”
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS
+BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
+GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+===============================================================================
+
+Contributors:
+   Konstantin Tyurin <konstantin@pluraf.com>
+
+******************************************************************************/
+
 
 #include "config.h"
 
@@ -26,6 +61,8 @@ Contributors:
 #include "dynamic_security.h"
 #include "mosquitto.h"
 #include "mosquitto_broker.h"
+#include "jwt/jwt.h"
+#include "jwt/jwt_helpers.h"
 
 
 /* ################################################################
@@ -68,7 +105,6 @@ int dynsec_auth__base64_encode(unsigned char *in, int in_len, char **encoded)
 
 	return 0;
 }
-
 
 int dynsec_auth__base64_decode(char *in, unsigned char **decoded, int *decoded_len)
 {
@@ -113,7 +149,6 @@ int dynsec_auth__base64_decode(char *in, unsigned char **decoded, int *decoded_l
 	return 0;
 }
 
-
 /* ################################################################
  * #
  * # Password functions
@@ -148,7 +183,6 @@ int dynsec_auth__pw_hash(struct dynsec__client *client, const char *password, un
 			digest, password_hash_len, password_hash);
 }
 
-
 /* ################################################################
  * #
  * # Username/password check
@@ -168,40 +202,60 @@ static int memcmp_const(const void *a, const void *b, size_t len)
 	return rc;
 }
 
+/* ################################################################
+ * #
+ * # Authentication selection functions
+ * #
+ * ################################################################ */
 
-int dynsec_auth__basic_auth_callback(int event, void *event_data, void *userdata)
+int dynsec_auth__authenticate(const struct dynsec__client * client, const struct mosquitto_evt_basic_auth *ed)
 {
-	struct mosquitto_evt_basic_auth *ed = event_data;
-	struct dynsec__client *client;
-	unsigned char password_hash[64]; /* For SHA512 */
-	const char *clientid;
-
-	UNUSED(event);
-	UNUSED(userdata);
-
-	if(ed->username == NULL || ed->password == NULL) return MOSQ_ERR_PLUGIN_DEFER;
-
-	client = dynsec_clients__find(ed->username);
-	if(client){
-		if(client->disabled){
-			return MOSQ_ERR_AUTH;
-		}
-		if(client->clientid){
-			clientid = mosquitto_client_id(ed->client);
-			if(clientid == NULL || strcmp(client->clientid, clientid)){
-				return MOSQ_ERR_AUTH;
-			}
-		}
+	if(strcmp(client->authtype, MQTT_AUTH_PASSWORD) == 0){
+		unsigned char password_hash[64];  // For SHA512
 		if(client->pw.valid && dynsec_auth__pw_hash(client, ed->password, password_hash, sizeof(password_hash), false) == MOSQ_ERR_SUCCESS){
 			if(memcmp_const(client->pw.password_hash, password_hash, sizeof(password_hash)) == 0){
 				return MOSQ_ERR_SUCCESS;
 			}else{
 				return MOSQ_ERR_AUTH;
 			}
-		}else{
-			return MOSQ_ERR_PLUGIN_DEFER;
 		}
-	}else{
-		return MOSQ_ERR_PLUGIN_DEFER;
+	}else if(strcmp(client->authtype, MQTT_AUTH_JWT_ES256) == 0){
+		point_t key;
+		int rc = public_key_from_pem(client->jwtkey, &key);
+		if(rc != 0){
+			mosquitto_log_printf(MOSQ_LOG_WARNING, "Can't load public key");
+			return MOSQ_ERR_AUTH;
+		}
+		if(jwt_verify(ed->password, &key) == 1) return MOSQ_ERR_SUCCESS;
 	}
+	return MOSQ_ERR_PLUGIN_DEFER;
+}
+
+/* ################################################################
+ * #
+ * # Plugin callback
+ * #
+ * ################################################################ */
+
+int dynsec_auth__basic_auth_callback(int event, void *event_data, void *userdata)
+{
+	struct mosquitto_evt_basic_auth *ed = event_data;
+	struct dynsec__client *client;
+	const char * clientid;
+	const char * authtype;
+
+	UNUSED(event);
+	UNUSED(userdata);
+
+	if(ed->username == NULL && ed->password == NULL) return MOSQ_ERR_PLUGIN_DEFER;
+
+	clientid = mosquitto_client_id(ed->client);
+	client = dynsec_clients__find(clientid, ed->username);
+
+	if(client){
+		if(client->disabled) return MOSQ_ERR_AUTH;
+		return dynsec_auth__authenticate(client, ed);
+	}
+
+	return MOSQ_ERR_PLUGIN_DEFER;
 }

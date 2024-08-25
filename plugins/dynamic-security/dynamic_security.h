@@ -1,22 +1,56 @@
-#ifndef DYNAMIC_SECURITY_H
-#define DYNAMIC_SECURITY_H
+/* SPDX-License-Identifier: BSD-3-Clause */
+
 /*
 Copyright (c) 2020 Roger Light <roger@atchoo.org>
 
 All rights reserved. This program and the accompanying materials
-are made available under the terms of the Eclipse Public License 2.0
-and Eclipse Distribution License v1.0 which accompany this distribution.
+are made available under the terms of Eclipse Distribution License v1.0
+which accompany this distribution.
 
-The Eclipse Public License is available at
-   https://www.eclipse.org/legal/epl-2.0/
-and the Eclipse Distribution License is available at
-  http://www.eclipse.org/org/documents/edl-v10.php.
-
-SPDX-License-Identifier: EPL-2.0 OR BSD-3-Clause
+The Eclipse Distribution License is available at
+  http://www.eclipse.org/org/documents/edl-v10.php
 
 Contributors:
    Roger Light - initial implementation and documentation.
 */
+
+/*
+Copyright (c) 2024 Pluraf Embedded AB <code@pluraf.com>
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice,
+this list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright notice,
+this list of conditions and the following disclaimer in the documentation
+and/or other materials provided with the distribution.
+
+3. Neither the name of the copyright holder nor the names of its contributors
+may be used to endorse or promote products derived from this software without
+specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS “AS IS”
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS
+BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
+GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+===============================================================================
+
+Contributors:
+   Konstantin Tyurin <konstantin@pluraf.com>
+*/
+
+
+#ifndef __DYNAMIC_SECURITY_H__
+#define __DYNAMIC_SECURITY_H__
 
 #include <cjson/cJSON.h>
 #include <uthash.h>
@@ -37,6 +71,20 @@ Contributors:
 #define ACL_TYPE_UNSUB_GENERIC "unsubscribe"
 #define ACL_TYPE_UNSUB_LITERAL "unsubscribeLiteral"
 #define ACL_TYPE_UNSUB_PATTERN "unsubscribePattern"
+
+/* ################################################################
+ * #
+ * # Authentication types
+ * #
+ * ################################################################ */
+
+#define MQTT_AUTH_KEY_PREFIX "jwt_"
+
+#define MQTT_AUTH_PASSWORD "password"
+#define MQTT_AUTH_JWT_ES256 (MQTT_AUTH_KEY_PREFIX "es256")
+#define MQTT_AUTH_JWT_RS256 (MQTT_AUTH_KEY_PREFIX "rs256")
+#define MQTT_AUTH_NONE "none"
+#define MQTT_AUTH_INVALID "invalid"
 
 /* ################################################################
  * #
@@ -75,11 +123,16 @@ struct dynsec__rolelist{
 
 struct dynsec__client{
 	UT_hash_handle hh;
+	UT_hash_handle hh_clientid;
+	UT_hash_handle hh_username;
 	struct mosquitto_pw pw;
 	struct dynsec__rolelist *rolelist;
 	struct dynsec__grouplist *grouplist;
+	char *connid;  // unique connector id
 	char *username;
 	char *clientid;
+	char *authtype;
+	char *jwtkey;
 	char *text_name;
 	char *text_description;
 	bool disabled;
@@ -184,7 +237,10 @@ int dynsec_clients__process_modify(cJSON *j_responses, struct mosquitto *context
 int dynsec_clients__process_remove_role(cJSON *j_responses, struct mosquitto *context, cJSON *command, char *correlation_data);
 int dynsec_clients__process_set_id(cJSON *j_responses, struct mosquitto *context, cJSON *command, char *correlation_data);
 int dynsec_clients__process_set_password(cJSON *j_responses, struct mosquitto *context, cJSON *command, char *correlation_data);
-struct dynsec__client *dynsec_clients__find(const char *username);
+struct dynsec__client * dynsec_clients__find(const char * clientid, const char * username);
+struct dynsec__client * dynsec_clients__get(const char * connid);
+int dynsec_clients__add(struct dynsec__client * client);
+int dynsec_clients__add_inorder(struct dynsec__client * client);
 
 
 /* ################################################################
@@ -208,7 +264,7 @@ void dynsec_clientlist__kick_all(struct dynsec__clientlist *base_clientlist);
 
 void dynsec_groups__cleanup(void);
 int dynsec_groups__config_load(cJSON *tree);
-int dynsec_groups__add_client(const char *username, const char *groupname, int priority, bool update_config);
+int dynsec_groups__add_client(struct dynsec__client * client, const char *groupname, int priority, bool update_config);
 int dynsec_groups__config_save(cJSON *tree);
 int dynsec_groups__process_add_client(cJSON *j_responses, struct mosquitto *context, cJSON *command, char *correlation_data);
 int dynsec_groups__process_add_role(cJSON *j_responses, struct mosquitto *context, cJSON *command, char *correlation_data);
@@ -270,4 +326,4 @@ int dynsec_rolelist__load_from_json(cJSON *command, struct dynsec__rolelist **ro
 void dynsec_rolelist__cleanup(struct dynsec__rolelist **base_rolelist);
 cJSON *dynsec_rolelist__all_to_json(struct dynsec__rolelist *base_rolelist);
 
-#endif
+#endif  // __DYNAMIC_SECURITY_H__

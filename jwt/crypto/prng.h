@@ -1,20 +1,6 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 
 /*
-Copyright (c) 2020 Roger Light <roger@atchoo.org>
-
-All rights reserved. This program and the accompanying materials
-are made available under the terms of Eclipse Distribution License v1.0
-which accompany this distribution.
-
-The Eclipse Distribution License is available at
-  http://www.eclipse.org/org/documents/edl-v10.php
-
-Contributors:
-   Roger Light - initial implementation and documentation.
-*/
-
-/*
 Copyright (c) 2024 Pluraf Embedded AB <code@pluraf.com>
 
 Redistribution and use in source and binary forms, with or without
@@ -41,27 +27,15 @@ GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
 HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
 LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-===============================================================================
-
-Contributors:
-   Konstantin Tyurin <konstantin@pluraf.com>
 */
 
 
-#ifndef __JSON_HELP_H__
-#define __JSON_HELP_H__
+#include <stdlib.h>
 
-#include <cjson/cJSON.h>
-#include <stdbool.h>
 
-/* "optional==false" can also be taken to mean "only return success if the key exists and is valid" */
-int json_get_bool(cJSON *json, const char *name, bool *value, bool optional, bool default_value);
-int json_get_int(cJSON *json, const char *name, int *value, bool optional, int default_value);
-int json_get_string(cJSON *json, const char *name, char **value, bool optional);
-int json_get_object(cJSON *json, const char *name, cJSON **value, bool optional);
-
-cJSON *cJSON_AddIntToObject(cJSON * const object, const char * const name, int number);
-cJSON *cJSON_CreateInt(int num);
-
-#endif  // __JSON_HELP_H__
+static inline void prng(unsigned char *buf, size_t len)
+{
+    while (len--) {
+        *buf++ = rand() & 0xFF;
+    }
+}

@@ -148,6 +148,23 @@ const char *mosquitto_client_username(const struct mosquitto *client)
 }
 
 
+const char *mosquitto_client_clientid(const struct mosquitto * client)
+{
+	if(client){
+#ifdef WITH_BRIDGE
+		if(client->bridge){
+			return client->bridge->local_clientid;
+		}else
+#endif
+		{
+			return client->id;
+		}
+	}else{
+		return NULL;
+	}
+}
+
+
 int mosquitto_broker_publish(
 		const char *clientid,
 		const char *topic,
@@ -292,8 +309,6 @@ static void check_subscription_acls(struct mosquitto *context)
 		}
 	}
 }
-
-
 
 static void disconnect_client(struct mosquitto *context, bool with_will)
 {
