@@ -1,112 +1,65 @@
 {
-    "defaultACLAccess": {
-        "publishClientSend": false,
-        "publishClientReceive": true,
-        "subscribe": false,
-        "unsubscribe": true
-    },
-    "clients": [
-        {
-            "connid": "connid1",
-            "username": "admin",
-            "authtype": "password",
-            "textname": "Dynsec admin user",
-            "roles": [{
-                    "rolename": "admin"
-                }],
-            "password": {
-                "hash": "B/RHrnYXDcR3BInoSUVm2d/PgkFUQ6nJ4k2xOAXHxBfVwhawcsc8bwDBDQVVfv9N/KtB+nlrkEYT5m5Zn/Z7Hg==",
-                "salt": "H7sXuXHo4GUOVcLe",
-                "iterations": 101
-            }
-        },
-        {
-            "connid": "cfsfs",
-            "username": "f",
-            "authtype": "jwt_es256",
-            "jwtkey": "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAET1cbQ+piC3fCxfDdICJs3+iQmrzbSEkyc1gWpWqKGAq5Jf0x/tBofdSppTvuaA1+8F9Tf8xpwHUQNQIXbFD69A==\n-----END PUBLIC KEY-----",
-            "roles": []
-        },
-        {
-            "connid": "connid2",
-            "username": "f1",
-            "roles": []
-        },
-        {
-            "connid": "connid3",
-            "username": "admin1",
-            "textname": "Dynsec admin user",
-            "roles": [{"rolename": "admin"
-                }],
-            "password": {
-                "hash": "B/RHrnYXDcR3BInoSUVm2d/PgkFUQ6nJ4k2xOAXHxBfVwhawcsc8bwDBDQVVfv9N/KtB+nlrkEYT5m5Zn/Z7Hg==",
-                "salt": "H7sXuXHo4GUOVcLe",
-                "iterations": 101
-            },
-            "public_key": ""
-        }
-    ],
-    "groups": [{
-            "groupname": "1",
-            "textname": "",
-            "textdescription": "",
-            "roles": [{
-                    "rolename": "wer"
-                }],
-            "clients": []
-        }],
-    "roles": [{
-            "rolename": "admin",
-            "acls": [{
-                    "acltype": "publishClientSend",
-                    "topic": "$CONTROL/dynamic-security/#",
-                    "priority": 0,
-                    "allow": true
-                }, {
-                    "acltype": "publishClientReceive",
-                    "topic": "$CONTROL/dynamic-security/#",
-                    "priority": 0,
-                    "allow": true
-                }, {
-                    "acltype": "publishClientReceive",
-                    "topic": "$SYS/#",
-                    "priority": 0,
-                    "allow": true
-                }, {
-                    "acltype": "publishClientReceive",
-                    "topic": "#",
-                    "priority": 0,
-                    "allow": true
-                }, {
-                    "acltype": "subscribePattern",
-                    "topic": "$CONTROL/dynamic-security/#",
-                    "priority": 0,
-                    "allow": true
-                }, {
-                    "acltype": "subscribePattern",
-                    "topic": "$SYS/#",
-                    "priority": 0,
-                    "allow": true
-                }, {
-                    "acltype": "subscribePattern",
-                    "topic": "#",
-                    "priority": 0,
-                    "allow": true
-                }, {
-                    "acltype": "unsubscribePattern",
-                    "topic": "#",
-                    "priority": 0,
-                    "allow": true
-                }]
-        }, {
-            "rolename": "wer",
-            "textname": "",
-            "textdescription": "",
-            "acls": [{
-                    "acltype": "publishClientSend",
-                    "topic": "fsd",
-                    "priority": 0,
-                    "allow": true
-                }]
-        }]
+	"defaultACLAccess":	{
+		"publishClientSend":	false,
+		"publishClientReceive":	true,
+		"subscribe":	false,
+		"unsubscribe":	true
+	},
+	"clients":	[{
+			"connid":	"ffU2",
+			"authtype":	"jwt_es256",
+			"clientid":	"new3",
+			"disabled":	true,
+			"roles":	[],
+			"jwtkey":	"fdsf"
+		}, {
+			"connid":	"ffU3",
+			"authtype":	"jwt_es256",
+			"roles":	[],
+			"jwtkey":	"fdsf"
+		}, {
+			"connid":	"ffU5",
+			"authtype":	"password",
+			"username":	"nf1",
+			"roles":	[],
+			"password":	{
+				"hash":	"7deR8SuKFOat3vdYy5MChzONa6cqVplOYBQaKZctpjHUNborqUy3PSPg8S3JHXuBBjmM7UdyMY6ctFk0CH84Kg==",
+				"salt":	"2NIBMdQ27wlG1iQ6",
+				"iterations":	101
+			}
+		}, {
+			"connid":	"ffU6",
+			"authtype":	"none",
+			"clientid":	"nf1",
+			"roles":	[]
+		}, {
+			"connid":	"ffU7",
+			"authtype":	"none",
+			"username":	"new1",
+			"roles":	[]
+		}],
+	"groups":	[{
+			"groupname":	"1",
+			"roles":	[{
+					"rolename":	"wer"
+				}],
+			"clients":	[]
+		}],
+	"roles":	[{
+			"rolename":	"admin",
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"$CONTROL/dynamic-security/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"wer",
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"fsd",
+					"priority":	0,
+					"allow":	true
+				}]
+		}]
 }
