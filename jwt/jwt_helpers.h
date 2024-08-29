@@ -29,3 +29,5 @@ IN THE SOFTWARE.
 int public_key_from_pem(const char *pem_string, point_t * key);
 
 NN_DIGIT * private_key_from_pem(const char *pem_string);
+
+char *read_file_content(const char *file_path);
