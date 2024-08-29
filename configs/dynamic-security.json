@@ -28,6 +28,13 @@
             "roles": []
         },
         {
+            "connid": "test_jwt",
+            "username": "f_2",
+            "authtype": "jwt_es256",
+            "jwtkey": "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEEVs/o5+uQbTjL3chynL4wXgUg2R9q9UU8I5mEovUf86QZ7kOBIjJwqnzD1omageEHWwHdBO6B+dFabmdT9POxg==\n-----END PUBLIC KEY-----",
+            "roles": []
+        },
+        {
             "connid": "connid2",
             "username": "f1",
             "roles": []
