@@ -126,3 +126,24 @@ NN_DIGIT * private_key_from_pem(const char *pem_string)
 
     return key;
 }
+
+char *read_file_content(const char *file_path) {
+    FILE *fp = fopen(file_path, "r");
+    fseek(fp, 0, SEEK_END);
+    size_t file_size = ftell(fp);
+    rewind(fp);
+
+    char *content = malloc(file_size + 1);  
+
+    size_t bytes_read = fread(content, 1, file_size, fp);
+    if (bytes_read != file_size) {
+        free(content);
+        fclose(fp);
+        return NULL;
+    }
+
+    content[file_size] = '\0';  
+
+    fclose(fp);
+    return content;  
+}

@@ -1,5 +1,5 @@
 {
-	"defaultACLAccess":	{
+"defaultACLAccess":	{
 		"publishClientSend":	false,
 		"publishClientReceive":	true,
 		"subscribe":	false,
@@ -37,7 +37,13 @@
 			"authtype":	"none",
 			"username":	"new1",
 			"roles":	[]
-		}],
+		}, {
+      "connid": "test_jwt",
+      "authtype": "jwt_es256",
+      "username": "f_2",
+      "jwtkey": "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEEVs/o5+uQbTjL3chynL4wXgUg2R9q9UU8I5mEovUf86QZ7kOBIjJwqnzD1omageEHWwHdBO6B+dFabmdT9POxg==\n-----END PUBLIC KEY-----",
+      "roles": []
+    },],
 	"groups":	[{
 			"groupname":	"1",
 			"roles":	[{

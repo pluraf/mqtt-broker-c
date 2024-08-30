@@ -35,13 +35,15 @@ Contributors:
     Gökçe Yetiser Vural <gokce@pluraf.com>
 */
 
-
 #include "civetweb/civetweb.h"
 
 #include "uthash.h"
 
 #include "mosquitto_broker.h"
 #include "mosquitto_broker_internal.h"
+
+#include "jwt/jwt.h"
+#include "jwt/jwt_helpers.h"
 
 #include <string.h>
 
@@ -71,7 +73,6 @@ static int handler(struct mg_connection * conn, void * ignored)
         event_data.properties = NULL;
         event_data.reason_code = 0;
         event_data.reason_string = NULL;
-
         int rc = cb_found->cb(MOSQ_EVT_CONTROL, &event_data, &response);
         free(event_data.reason_string);
     }
@@ -89,19 +90,23 @@ static int handler(struct mg_connection * conn, void * ignored)
 
 int auth_handler(struct mg_connection * conn, void * cbdata)
 {
-    int authorized = 1;
+    int authorized = 0;
 
-    char * auth_token = mg_get_header(conn, "Authorization");
-    if(auth_token != NULL){
-        ///////////////////////////////////////////////////////
-        // TODO: Validate JWT TOKEN HERE
-        ///////////////////////////////////////////////////////
-    }
+    point_t *public_key = (point_t *)cbdata;
+
+    char * auth_token = mg_get_header(conn, "Authorization");  // TODO: Validate JWT Token
+    if(auth_token != NULL && strlen(auth_token) > 7){
+        const char *token = auth_token + 7;  // skip prefix (Bearer) 
+
+        if (jwt_verify(token, public_key) == 1) {
+            authorized = 1; 
+        } 
+    } 
 
     if(authorized) {
         return 1;
     } else {
-        mg_send_http_error(conn, 403, "");
+        mg_send_http_error(conn, 401, "");
         return 0;
     }
 }
@@ -110,12 +115,19 @@ int auth_handler(struct mg_connection * conn, void * cbdata)
 struct mg_context * start_server()
 {
     struct mg_context *ctx;
+    ecc_init();
+
+    const char *pem_file_path = "../../bits/public_key.pem";
+    char *pem_public_key = read_file_content(pem_file_path);
+    point_t *public_key = malloc(sizeof(point_t));
+    public_key_from_pem(pem_public_key, public_key);
+    free(pem_public_key);
 
     mg_init_library(0);
     ctx = mg_start(NULL, 0, NULL);
 
     mg_set_request_handler(ctx, "/command$", handler, NULL);
-    mg_set_auth_handler(ctx, "/**", auth_handler, NULL);
+    mg_set_auth_handler(ctx, "/**", auth_handler, public_key);
 
     return ctx;
 }
@@ -123,6 +135,11 @@ struct mg_context * start_server()
 
 void stop_server(struct mg_context * ctx)
 {
+    point_t *public_key = (point_t *)mg_get_user_data(ctx);
+    if(public_key){
+        free(public_key);
+    }
+
     /* Stop the server */
     mg_stop(ctx);
 

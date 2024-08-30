@@ -91,7 +91,18 @@ endif (INC_BRIDGE_SUPPORT)
 
 option(INC_RESTAPI "Include REST API?" ON)
 if (INC_RESTAPI)
-	set (MOSQ_SRCS ${MOSQ_SRCS} ../civetweb/civetweb.c ./rest_api.c)
+	set (MOSQ_SRCS ${MOSQ_SRCS}
+		../civetweb/civetweb.c 
+		./rest_api.c 
+		../jwt/jwt.c 
+		../jwt/jwt_helpers.c
+		../jwt/crypto/ecc-light-certificate/ecdsa.c 
+		../jwt/crypto/ecc-light-certificate/ecc.c
+		../jwt/crypto/ecc-light-certificate/nn.c
+		../jwt/crypto/sha2/sha2.c
+		../jwt/crypto/curve-params/secp256r1.c 	
+		../jwt/base64/base64.c	
+	)
 	add_definitions("-DWITH_RESTAPI")
 	set_source_files_properties(../civetweb/civetweb.c PROPERTIES COMPILE_FLAGS "-DNO_SSL_DL -DOPENSSL_API_3_0")
 endif (INC_RESTAPI)
