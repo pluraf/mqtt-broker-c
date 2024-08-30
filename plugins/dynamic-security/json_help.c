@@ -109,10 +109,9 @@ int json_get_int(cJSON *json, const char *name, int *value, bool optional, int d
 }
 
 
-int json_get_string(cJSON *json, const char *name, char **value, bool optional)
+int json_get_string_allow_empty(cJSON *json, const char *name, char **value, bool optional)
 {
     cJSON *jtmp;
-
     *value = NULL;
 
     jtmp = cJSON_GetObjectItem(json, name);
@@ -120,12 +119,8 @@ int json_get_string(cJSON *json, const char *name, char **value, bool optional)
         if(cJSON_IsString(jtmp) == false){
             return MOSQ_ERR_INVAL;
         }
-        if(strlen(jtmp->valuestring) > 0){
-            *value  = jtmp->valuestring;
-            return MOSQ_ERR_SUCCESS;
-        } else {
-            return MOSQ_ERR_INVAL;
-        }
+        *value  = jtmp->valuestring;
+        return MOSQ_ERR_SUCCESS;
     }else{
         if(optional == false){
             return MOSQ_ERR_INVAL;
@@ -133,6 +128,17 @@ int json_get_string(cJSON *json, const char *name, char **value, bool optional)
             return MOSQ_ERR_SUCCESS;
         }
     }
+}
+
+
+int json_get_string(cJSON *json, const char *name, char **value, bool optional)
+{
+    int rc = json_get_string_allow_empty(json, name, value, optional);
+    if(rc == MOSQ_ERR_SUCCESS && *value != NULL && strlen(*value) == 0){
+        *value = NULL;
+        return MOSQ_ERR_INVAL;
+    }
+    return rc;
 }
 
 

@@ -113,17 +113,20 @@ static int client_cmp_by_username(void *a, void *b)
 }
 
 
-int dynsec_clients__add_check_uniqueness(const struct dynsec__client *client) {
+int dynsec_clients__add_check_uniqueness(const char * connid, const char * clientid, const char * username)
+{
 	struct dynsec__client * existing = NULL;
 
-	HASH_FIND(hh, local_connectors, client->connid, strlen(client->connid), existing);
-	if (existing) return MOSQ_ERR_ALREADY_EXISTS;
-
-	if(client->clientid){
-		HASH_FIND(hh_clientid, local_clientid_clients, client->clientid, strlen(client->clientid), existing);
+	if (connid) {
+		HASH_FIND(hh, local_connectors, connid, strlen(connid), existing);
 		if (existing) return MOSQ_ERR_ALREADY_EXISTS;
-	}else if(client->username){
-		HASH_FIND(hh_username, local_username_clients, client->username, strlen(client->username), existing);
+	}
+
+	if(clientid){
+		HASH_FIND(hh_clientid, local_clientid_clients, clientid, strlen(clientid), existing);
+		if (existing) return MOSQ_ERR_ALREADY_EXISTS;
+	}else if(username){
+		HASH_FIND(hh_username, local_username_clients, username, strlen(username), existing);
 		if (existing) return MOSQ_ERR_ALREADY_EXISTS;
 	}
 
@@ -133,7 +136,7 @@ int dynsec_clients__add_check_uniqueness(const struct dynsec__client *client) {
 
 int dynsec_clients__add_inorder(struct dynsec__client *client)
 {
-	if(dynsec_clients__add_check_uniqueness(client) == MOSQ_ERR_SUCCESS){
+	if(dynsec_clients__add_check_uniqueness(client->connid, client->clientid, client->username) == MOSQ_ERR_SUCCESS){
 		HASH_ADD_KEYPTR_INORDER(hh, local_connectors, client->connid, strlen(client->connid), client, client_cmp_by_connid);
 		if(client->clientid){
 			HASH_ADD_KEYPTR_INORDER(hh_clientid, local_clientid_clients, client->clientid, strlen(client->clientid), client, client_cmp_by_clientid);
@@ -148,7 +151,7 @@ int dynsec_clients__add_inorder(struct dynsec__client *client)
 
 int dynsec_clients__add(struct dynsec__client *client)
 {
-	if(dynsec_clients__add_check_uniqueness(client) == MOSQ_ERR_SUCCESS){
+	if(dynsec_clients__add_check_uniqueness(client->connid, client->clientid, client->username) == MOSQ_ERR_SUCCESS){
 		HASH_ADD_KEYPTR(hh, local_connectors, client->connid, strlen(client->connid), client);
 		if(client->clientid){
 			HASH_ADD_KEYPTR(hh_clientid, local_clientid_clients, client->clientid, strlen(client->clientid), client);
@@ -243,6 +246,30 @@ void dynsec_clients__kick_clients(struct dynsec__client *client)
 			mosquitto_kick_client_by_clientid(client->clientid, false);
 		}else if(client->username){
 			mosquitto_kick_client_by_username(client->username, false);
+		}
+	}
+}
+
+
+static void client__drop_aid_hash(struct dynsec__client *client)
+{
+	if(client){
+		if(client->clientid){
+			HASH_DELETE(hh_clientid, local_clientid_clients, client);
+		}else if(client->username){
+			HASH_DELETE(hh_username, local_username_clients, client);
+		}
+	}
+}
+
+
+static void client__add_aid_hash(struct dynsec__client *client)
+{
+	if(client){
+		if(client->clientid){
+			HASH_ADD_KEYPTR_INORDER(hh_clientid, local_clientid_clients, client->clientid, strlen(client->clientid), client, client_cmp_by_clientid);
+		}else if(client->username){
+			HASH_ADD_KEYPTR_INORDER(hh_username, local_username_clients, client->username, strlen(client->username), client, client_cmp_by_username);
 		}
 	}
 }
@@ -440,6 +467,7 @@ static int dynsec__config_add_clients(cJSON *j_clients, struct dynsec__client * 
 		cJSON_AddItemToArray(j_clients, j_client);
 
 		if((client->connid && cJSON_AddStringToObject(j_client, "connid", client->connid) == NULL)
+				|| (client->authtype && cJSON_AddStringToObject(j_client, "authtype", client->authtype) == NULL)
 				|| (client->username && (cJSON_AddStringToObject(j_client, "username", client->username) == NULL))
 				|| (client->clientid && (cJSON_AddStringToObject(j_client, "clientid", client->clientid) == NULL))
 				|| (client->text_name && (cJSON_AddStringToObject(j_client, "textname", client->text_name) == NULL))
@@ -538,12 +566,6 @@ int dynsec_clients__process_create(cJSON *j_responses, struct mosquitto *context
 		return MOSQ_ERR_INVAL;
 	}
 
-	// Either clientid or username (or both) has to be set
-	if(username == NULL && clientid == NULL) {
-		dynsec__command_reply(j_responses, context, "createClient", "Missing both clientid and username", correlation_data);
-		return MOSQ_ERR_INVAL;
-	}
-
 	// Check username and clientid are valid UTF8
 	if(username && mosquitto_validate_utf8(username, (int)strlen(username)) != MOSQ_ERR_SUCCESS){
 		dynsec__command_reply(j_responses, context, "createClient", "Username not valid UTF-8", correlation_data);
@@ -620,7 +642,7 @@ int dynsec_clients__process_create(cJSON *j_responses, struct mosquitto *context
 		return MOSQ_ERR_NOMEM;
 	}
 
-	if (strcmp(client->authtype, MQTT_AUTH_PASSWORD)){
+	if (strcmp(client->authtype, MQTT_AUTH_PASSWORD) == 0){
 		if(dynsec_auth__pw_hash(client, password, client->pw.password_hash, sizeof(client->pw.password_hash), true)){
 			dynsec__command_reply(j_responses, context, "createClient", "Internal error", correlation_data);
 			client__free_item(client);
@@ -952,15 +974,17 @@ static void client__remove_all_roles(struct dynsec__client *client)
 
 int dynsec_clients__process_modify(cJSON *j_responses, struct mosquitto *context, cJSON *command, char *correlation_data)
 {
-	char *connid;
-	char *clientid = NULL;
-	char *password = NULL;
-	char *text_name = NULL, *text_description = NULL;
+	char * connid;
+	char * clientid = NULL;
+	char * username = NULL;
+	char * password = NULL;
+	char * text_name = NULL, * text_description = NULL;
 	bool have_clientid = false, have_text_name = false, have_text_description = false, have_rolelist = false, have_password = false;
+	bool have_username = false;
 	struct dynsec__client *client;
 	struct dynsec__group *group;
 	struct dynsec__rolelist *rolelist = NULL;
-	char *str;
+	char * str;
 	int rc;
 	int priority;
 	cJSON *j_group, *j_groups;
@@ -981,10 +1005,19 @@ int dynsec_clients__process_modify(cJSON *j_responses, struct mosquitto *context
 		return MOSQ_ERR_INVAL;
 	}
 
-	if(json_get_string(command, "clientid", &str, false) == MOSQ_ERR_SUCCESS){
+	json_get_string_allow_empty(command, "clientid", &clientid, true);
+	json_get_string_allow_empty(command, "username", &username, true);
+
+	// We need to check uniqueness of clientid and username
+	if(dynsec_clients__add_check_uniqueness(NULL, clientid, username) != MOSQ_ERR_SUCCESS){
+		dynsec__command_reply(j_responses, context, "modifyClient", "Connector will become ambiguous", correlation_data);
+		return MOSQ_ERR_INVAL;
+	}
+
+	if(clientid != NULL){
 		have_clientid = true;
-		if(str && strlen(str) > 0){
-			clientid = mosquitto_strdup(str);
+		if(strlen(clientid) > 0){
+			clientid = mosquitto_strdup(clientid);
 			if(clientid == NULL){
 				dynsec__command_reply(j_responses, context, "modifyClient", "Internal error", correlation_data);
 				rc = MOSQ_ERR_NOMEM;
@@ -995,13 +1028,25 @@ int dynsec_clients__process_modify(cJSON *j_responses, struct mosquitto *context
 		}
 	}
 
-	if(json_get_string(command, "password", &password, false) == MOSQ_ERR_SUCCESS){
-		if(strlen(password) > 0){
-			have_password = true;
+	if(username != NULL){
+		have_username = true;
+		if(strlen(username) > 0){
+			username = mosquitto_strdup(username);
+			if(username == NULL){
+				dynsec__command_reply(j_responses, context, "modifyClient", "Internal error", correlation_data);
+				rc = MOSQ_ERR_NOMEM;
+				goto error;
+			}
+		}else{
+			username = NULL;
 		}
 	}
 
-	if(json_get_string(command, "textname", &str, false) == MOSQ_ERR_SUCCESS){
+	if(json_get_string(command, "password", &password, false) == MOSQ_ERR_SUCCESS){
+		have_password = true;
+	}
+
+	if(json_get_string_allow_empty(command, "textname", &str, false) == MOSQ_ERR_SUCCESS){
 		have_text_name = true;
 		text_name = mosquitto_strdup(str);
 		if(text_name == NULL){
@@ -1011,7 +1056,7 @@ int dynsec_clients__process_modify(cJSON *j_responses, struct mosquitto *context
 		}
 	}
 
-	if(json_get_string(command, "textdescription", &str, false) == MOSQ_ERR_SUCCESS){
+	if(json_get_string_allow_empty(command, "textdescription", &str, false) == MOSQ_ERR_SUCCESS){
 		have_text_description = true;
 		text_description = mosquitto_strdup(str);
 		if(text_description == NULL){
@@ -1092,9 +1137,20 @@ int dynsec_clients__process_modify(cJSON *j_responses, struct mosquitto *context
 		}
 	}
 
-	if(have_clientid){
-		mosquitto_free(client->clientid);
-		client->clientid = clientid;
+	if(have_clientid || have_username){
+		client__drop_aid_hash(client);
+
+		if(have_clientid){
+			mosquitto_free(client->clientid);
+			client->clientid = clientid;
+		}
+
+		if(have_username){
+			mosquitto_free(client->username);
+			client->username = username;
+		}
+
+		client__add_aid_hash(client);
 	}
 
 	if(have_text_name){
