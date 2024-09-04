@@ -34,6 +34,8 @@ IN THE SOFTWARE.
 
 #include "jwt.h"
 
+#include <mosquitto.h>
+
 
 char* jwt_create(char * project_id, long long int time, NN_DIGIT * priv_key, int jwt_exp_secs) {
     ecc_init();  // TODO: Move to init
@@ -83,21 +85,34 @@ char* jwt_create(char * project_id, long long int time, NN_DIGIT * priv_key, int
 
 int jwt_verify(char * jwt,  point_t * pub_key)
 {
-    ecc_init(); // TODO: Has to be initialized only once -> move to broker init phase
+    //ecc_init(); // TODO: Has to be initialized only once -> move to broker init phase
 
-    char * chunk_head = jwt;
-    char * dot_pos = strchr(chunk_head, '.');
-    simple_array_t jwt_header = base64_decode(chunk_head, dot_pos - chunk_head + 1);
-    chunk_head = dot_pos + 1;
-    dot_pos = strchr(chunk_head, '.');
-    simple_array_t jwt_body = base64_decode(chunk_head, dot_pos - chunk_head + 1);
-    chunk_head = dot_pos + 1;
-    simple_array_t jwt_signature = base64_decode(chunk_head, strlen(chunk_head));
+    // First check if jwt is in correct format then decode
+    char * dot_pos_1 = strchr(jwt, '.');
+    if (!dot_pos_1) {
+        mosquitto_log_printf(MOSQ_LOG_ERR, "Invalid JWT: Missing dot!");
+        return 0;
+    }  // dot_pos_1 = header_end
+    
+    char * dot_pos_2 = strchr(dot_pos_1 + 1, '.');
+    if (!dot_pos_2) {
+        mosquitto_log_printf(MOSQ_LOG_ERR, "Invalid JWT: Missing dot!");
+        return 0;
+    }  // dot_pos_2 = body_end
+
+    if (strlen(dot_pos_2 + 1) < (2 * NUMBYTES)) {
+        mosquitto_log_printf(MOSQ_LOG_ERR, "Invalid JWT: Signature too short!");
+        return 0;
+    }  // check signature length
+
+    simple_array_t jwt_header = base64_decode(jwt, dot_pos_1 - jwt);
+    simple_array_t jwt_body = base64_decode(dot_pos_1 + 1, dot_pos_2 - (dot_pos_1 + 1));
+    simple_array_t jwt_signature = base64_decode(dot_pos_2 + 1, strlen(dot_pos_2 + 1));
 
     SHA256_CTX c256;
     uint8_t hash[SHA256_DIGEST_LENGTH];
     SHA256_Init(&c256);
-    SHA256_Update(&c256, jwt, dot_pos - jwt);
+    SHA256_Update(&c256, jwt, dot_pos_2 - jwt);
     SHA256_Final(hash, &c256);
 
     NN_DIGIT signature_r[NUMWORDS] = {};
