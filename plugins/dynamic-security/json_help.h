@@ -61,6 +61,7 @@ int json_get_int(cJSON *json, const char *name, int *value, bool optional, int d
 int json_get_string(cJSON *json, const char *name, char **value, bool optional);
 int json_get_string_allow_empty(cJSON *json, const char *name, char **value, bool optional);
 int json_get_object(cJSON *json, const char *name, cJSON **value, bool optional);
+int json_get_array(cJSON *json, const char *name, cJSON **obj, bool optional);
 
 cJSON *cJSON_AddIntToObject(cJSON * const object, const char * const name, int number);
 cJSON *cJSON_CreateInt(int num);

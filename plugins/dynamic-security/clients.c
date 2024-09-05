@@ -725,36 +725,60 @@ int dynsec_clients__process_create(cJSON *j_responses, struct mosquitto *context
 
 int dynsec_clients__process_delete(cJSON *j_responses, struct mosquitto *context, cJSON *command, char *correlation_data)
 {
-	char *connid;
+	cJSON * j_connectors;
+	cJSON * j_response;
+	cJSON * j_deleted;
 	struct dynsec__client *client;
 	const char *admin_clientid, *admin_username;
 
-	if(json_get_string(command, "connid", &connid, false) != MOSQ_ERR_SUCCESS){
-		dynsec__command_reply(j_responses, context, "deleteClient", "Invalid/missing username", correlation_data);
+	if(json_get_array(command, "connectors", &j_connectors, false) != MOSQ_ERR_SUCCESS){
+		dynsec__command_reply(j_responses, context, "deleteConnectors", "Invalid/missing connids", correlation_data);
 		return MOSQ_ERR_INVAL;
 	}
 
-	client = dynsec_clients__get(connid);
-	if(client){
-		dynsec__remove_client_from_all_groups(client);
-		client__remove_all_roles(client);
-		client__free_item(client);
-		dynsec__config_save();
-		dynsec__command_reply(j_responses, context, "deleteClient", NULL, correlation_data);
+	j_response = cJSON_CreateObject();
+	if(j_response == NULL) return MOSQ_ERR_NOMEM;
 
-		/* Enforce any changes */
-		dynsec_clients__kick_clients(client);
-
-		admin_clientid = mosquitto_client_id(context);
-		admin_username = mosquitto_client_username(context);
-		mosquitto_log_printf(MOSQ_LOG_INFO, "dynsec: %s/%s | deleteClient | connid=%s",
-				admin_clientid, admin_username, connid);
-
-		return MOSQ_ERR_SUCCESS;
-	}else{
-		dynsec__command_reply(j_responses, context, "deleteClient", "Client not found", correlation_data);
-		return MOSQ_ERR_SUCCESS;
+	if(cJSON_AddStringToObject(j_response, "command", "deleteConnectors") == NULL){
+		cJSON_Delete(j_response);
+		return MOSQ_ERR_NOMEM;
 	}
+
+	j_deleted = cJSON_AddArrayToObject(j_response, "deleted");
+	if(j_deleted == NULL){
+		cJSON_Delete(j_response);
+		return MOSQ_ERR_NOMEM;
+	}
+
+	int conn_count = cJSON_GetArraySize(j_connectors);
+	for(int i=0; i<conn_count; i++){
+		char * connid = cJSON_GetStringValue(cJSON_GetArrayItem(j_connectors, i));
+		if(connid == NULL)continue;
+
+		client = dynsec_clients__get(connid);
+		if(client){
+			cJSON * j_deleted_item = cJSON_CreateString(connid);
+			if(j_deleted_item == NULL)continue;
+
+			dynsec__remove_client_from_all_groups(client);
+			client__remove_all_roles(client);
+			client__free_item(client);
+
+			cJSON_AddItemToArray(j_deleted, j_deleted_item);
+
+			// Enforce any changes
+			dynsec_clients__kick_clients(client);
+		}
+	}
+	dynsec__config_save();
+	cJSON_AddItemToArray(j_responses, j_response);
+
+	admin_clientid = mosquitto_client_id(context);
+	admin_username = mosquitto_client_username(context);
+	mosquitto_log_printf(MOSQ_LOG_INFO, "dynsec: %s/%s | deleteConnectors",
+			admin_clientid, admin_username);
+
+	return MOSQ_ERR_SUCCESS;
 }
 
 
@@ -1213,9 +1237,11 @@ static cJSON *add_client_to_json(struct dynsec__client *client, bool verbose)
 			return NULL;
 		}
 
-		if(cJSON_AddStringToObject(j_client, "connid", client->connid) == NULL
+		if((client->connid && cJSON_AddStringToObject(j_client, "connid", client->connid) == NULL)
+				|| (client->connid && cJSON_AddStringToObject(j_client, "authtype", client->authtype) == NULL)
 				|| (client->username && (cJSON_AddStringToObject(j_client, "username", client->username) == NULL))
 				|| (client->clientid && (cJSON_AddStringToObject(j_client, "clientid", client->clientid) == NULL))
+				|| (client->jwtkey && (cJSON_AddStringToObject(j_client, "jwtkey", client->jwtkey) == NULL))
 				|| (client->text_name && (cJSON_AddStringToObject(j_client, "textname", client->text_name) == NULL))
 				|| (client->text_description && (cJSON_AddStringToObject(j_client, "textdescription", client->text_description) == NULL))
 				|| (client->disabled && (cJSON_AddBoolToObject(j_client, "disabled", client->disabled) == NULL))){
@@ -1320,7 +1346,7 @@ int dynsec_clients__process_list(cJSON *j_responses, struct mosquitto *context, 
 		return MOSQ_ERR_NOMEM;
 	}
 
-	int connectors_count = HASH_CNT(hh_clientid, local_clientid_clients) + HASH_CNT(hh_username, local_username_clients);
+	int connectors_count = HASH_COUNT(local_connectors);
 
 	if(cJSON_AddStringToObject(tree, "command", "listClients") == NULL
 			|| (j_data = cJSON_AddObjectToObject(tree, "data")) == NULL

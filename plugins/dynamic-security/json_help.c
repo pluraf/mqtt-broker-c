@@ -163,6 +163,27 @@ int json_get_object(cJSON *json, const char *name, cJSON **obj, bool optional)
 }
 
 
+int json_get_array(cJSON *json, const char *name, cJSON **obj, bool optional)
+{
+    cJSON *jtmp;
+
+    *obj = NULL;
+
+    jtmp = cJSON_GetObjectItem(json, name);
+    if(jtmp){
+        if(cJSON_IsArray(jtmp) == false){
+            return MOSQ_ERR_INVAL;
+        }
+        *obj  = jtmp;
+    }else{
+        if(optional == false){
+            return MOSQ_ERR_INVAL;
+        }
+    }
+    return MOSQ_ERR_SUCCESS;
+}
+
+
 cJSON *cJSON_AddIntToObject(cJSON * const object, const char * const name, int number)
 {
     char buf[30];
