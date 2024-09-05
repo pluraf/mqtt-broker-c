@@ -96,12 +96,12 @@ int auth_handler(struct mg_connection * conn, void * cbdata)
 
     char * auth_token = mg_get_header(conn, "Authorization");  // TODO: Validate JWT Token
     if(auth_token != NULL && strlen(auth_token) > 7){
-        const char *token = auth_token + 7;  // skip prefix (Bearer) 
+        const char *token = auth_token + 7;  // skip prefix (Bearer)
 
         if (jwt_verify(token, public_key) == 1) {
-            authorized = 1; 
-        } 
-    } 
+            authorized = 1;
+        }
+    }
 
     if(authorized) {
         return 1;
@@ -117,8 +117,12 @@ struct mg_context * start_server()
     struct mg_context *ctx;
     ecc_init();
 
-    const char *pem_file_path = "../../bits/public_key.pem";
-    char *pem_public_key = read_file_content(pem_file_path);
+    char const * pem_public_key = read_file_content(db.config->http_api_pkey_file);
+    if(pem_public_key == NULL){
+        mosquitto_log_printf(MOSQ_LOG_ERR, "Failure reading http_api_pkey_file!");
+        return NULL;
+    }
+
     point_t *public_key = malloc(sizeof(point_t));
     public_key_from_pem(pem_public_key, public_key);
     free(pem_public_key);
@@ -135,6 +139,8 @@ struct mg_context * start_server()
 
 void stop_server(struct mg_context * ctx)
 {
+    if(ctx == NULL) return;
+
     point_t *public_key = (point_t *)mg_get_user_data(ctx);
     if(public_key){
         free(public_key);

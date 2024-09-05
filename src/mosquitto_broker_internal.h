@@ -1,21 +1,55 @@
-/*
+/* SPDX-License-Identifier: BSD-3-Clause */
+
+/******************************************************************************
 Copyright (c) 2009-2020 Roger Light <roger@atchoo.org>
 
 All rights reserved. This program and the accompanying materials
-are made available under the terms of the Eclipse Public License 2.0
-and Eclipse Distribution License v1.0 which accompany this distribution.
+are made available under the terms of Eclipse Distribution License v1.0
+which accompany this distribution.
 
-The Eclipse Public License is available at
-   https://www.eclipse.org/legal/epl-2.0/
-and the Eclipse Distribution License is available at
-  http://www.eclipse.org/org/documents/edl-v10.php.
-
-SPDX-License-Identifier: EPL-2.0 OR BSD-3-Clause
+The Eclipse Distribution License is available at
+  http://www.eclipse.org/org/documents/edl-v10.php
 
 Contributors:
    Roger Light - initial implementation and documentation.
    Tatsuzo Osawa - Add epoll.
-*/
+
+******************************************************************************/
+
+/******************************************************************************
+Copyright (c) 2024 Pluraf Embedded AB <code@pluraf.com>
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice,
+this list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright notice,
+this list of conditions and the following disclaimer in the documentation
+and/or other materials provided with the distribution.
+
+3. Neither the name of the copyright holder nor the names of its contributors
+may be used to endorse or promote products derived from this software without
+specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS “AS IS”
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS
+BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
+GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+===============================================================================
+
+Contributors:
+   Konstantin Tyurin <konstantin@pluraf.com>
+
+******************************************************************************/
 
 #ifndef MOSQUITTO_BROKER_INTERNAL_H
 #define MOSQUITTO_BROKER_INTERNAL_H
@@ -168,21 +202,21 @@ struct mosquitto__security_options {
 	 * in config__read() with regards whether allow_anonymous
 	 * should be disabled when these options are set.
 	 */
-	struct mosquitto__unpwd *unpwd;
-	struct mosquitto__unpwd *psk_id;
-	struct mosquitto__acl_user *acl_list;
-	struct mosquitto__acl *acl_patterns;
-	char *password_file;
-	char *psk_file;
-	char *acl_file;
-	struct mosquitto__auth_plugin_config *auth_plugin_configs;
+	struct mosquitto__unpwd * unpwd;
+	struct mosquitto__unpwd * psk_id;
+	struct mosquitto__acl_user * acl_list;
+	struct mosquitto__acl * acl_patterns;
+	char * password_file;
+	char * psk_file;
+	char * acl_file;
+	struct mosquitto__auth_plugin_config * auth_plugin_configs;
 	int auth_plugin_config_count;
 	int8_t allow_anonymous;
 	bool allow_zero_length_clientid;
-	char *auto_id_prefix;
+	char * auto_id_prefix;
 	uint16_t auto_id_prefix_len;
 	struct plugin__callbacks plugin_callbacks;
-	mosquitto_plugin_id_t *pid; /* For registering as a "plugin" */
+	mosquitto_plugin_id_t * pid; /* For registering as a "plugin" */
 };
 
 #ifdef WITH_EPOLL
@@ -304,6 +338,7 @@ struct mosquitto__config {
 	int bridge_count;
 #endif
 	struct mosquitto__security_options security_options;
+	char * http_api_pkey_file;
 };
 
 

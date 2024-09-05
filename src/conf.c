@@ -2186,6 +2186,8 @@ static int config__read_file_core(struct mosquitto__config *config, bool reload,
 #else
 					log__printf(NULL, MOSQ_LOG_WARNING, "Warning: Websockets support not available.");
 #endif
+				}else if(!strcmp(token, "http_api_pkey_file")){
+					if(conf__parse_string(&token, "http_api_pkey_file", &config->http_api_pkey_file, saveptr)) return MOSQ_ERR_INVAL;
 				}else{
 					log__printf(NULL, MOSQ_LOG_ERR, "Error: Unknown configuration variable \"%s\".", token);
 					return MOSQ_ERR_INVAL;

@@ -129,11 +129,13 @@ NN_DIGIT * private_key_from_pem(const char *pem_string)
 
 char *read_file_content(const char *file_path) {
     FILE *fp = fopen(file_path, "r");
+    if(fp == NULL) return NULL;
+
     fseek(fp, 0, SEEK_END);
     size_t file_size = ftell(fp);
     rewind(fp);
 
-    char *content = malloc(file_size + 1);  
+    char *content = malloc(file_size + 1);
 
     size_t bytes_read = fread(content, 1, file_size, fp);
     if (bytes_read != file_size) {
@@ -142,8 +144,8 @@ char *read_file_content(const char *file_path) {
         return NULL;
     }
 
-    content[file_size] = '\0';  
+    content[file_size] = '\0';
 
     fclose(fp);
-    return content;  
+    return content;
 }
