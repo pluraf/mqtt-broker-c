@@ -35,6 +35,7 @@ IN THE SOFTWARE.
 #include "jwt.h"
 
 #include <mosquitto.h>
+#include <mosquitto_broker.h>
 
 
 char* jwt_create(char * project_id, long long int time, NN_DIGIT * priv_key, int jwt_exp_secs) {
@@ -93,7 +94,7 @@ int jwt_verify(char * jwt,  point_t * pub_key)
         mosquitto_log_printf(MOSQ_LOG_ERR, "Invalid JWT: Missing dot!");
         return 0;
     }  // dot_pos_1 = header_end
-    
+
     char * dot_pos_2 = strchr(dot_pos_1 + 1, '.');
     if (!dot_pos_2) {
         mosquitto_log_printf(MOSQ_LOG_ERR, "Invalid JWT: Missing dot!");
