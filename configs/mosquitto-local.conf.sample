@@ -1,0 +1,8 @@
+# Replace parts <<>> with your local path to m-broker-c project
+
+plugin <</all/mine/pluraf/iotplan/repos/m-broker-c>>/build/plugins/dynamic-security/mosquitto_dynamic_security.so
+plugin_opt_config_file <</all/mine/pluraf/iotplan/repos/m-broker-c>>/configs/dynamic-security.json
+
+http_api_pkey_file <</all/mine/pluraf/iotplan/repos/m-broker-c>>/bits/public_key.pem
+
+#allow_anonymous true
