@@ -105,3 +105,6 @@ obj-*/
 
 # Others
 tmp/
+
+# VSCode
+.vscode/settings.json
