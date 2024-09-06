@@ -1,71 +1,71 @@
 {
-"defaultACLAccess":	{
-		"publishClientSend":	false,
-		"publishClientReceive":	true,
-		"subscribe":	false,
-		"unsubscribe":	true
-	},
-	"clients":	[{
-			"connid":	"ffU2",
-			"authtype":	"jwt_es256",
-			"clientid":	"new3",
-			"disabled":	true,
-			"roles":	[],
-			"jwtkey":	"fdsf"
-		}, {
-			"connid":	"ffU3",
-			"authtype":	"jwt_es256",
-			"roles":	[],
-			"jwtkey":	"fdsf"
-		}, {
-			"connid":	"ffU5",
-			"authtype":	"password",
-			"username":	"nf1",
-			"roles":	[],
-			"password":	{
-				"hash":	"7deR8SuKFOat3vdYy5MChzONa6cqVplOYBQaKZctpjHUNborqUy3PSPg8S3JHXuBBjmM7UdyMY6ctFk0CH84Kg==",
-				"salt":	"2NIBMdQ27wlG1iQ6",
-				"iterations":	101
-			}
-		}, {
-			"connid":	"ffU6",
-			"authtype":	"none",
-			"clientid":	"nf1",
-			"roles":	[]
-		}, {
-			"connid":	"ffU7",
-			"authtype":	"none",
-			"username":	"new1",
-			"roles":	[]
-		}, {
-      "connid": "test_jwt",
-      "authtype": "jwt_es256",
-      "username": "f_2",
-      "jwtkey": "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEEVs/o5+uQbTjL3chynL4wXgUg2R9q9UU8I5mEovUf86QZ7kOBIjJwqnzD1omageEHWwHdBO6B+dFabmdT9POxg==\n-----END PUBLIC KEY-----",
-      "roles": []
-    }],
-	"groups":	[{
-			"groupname":	"1",
-			"roles":	[{
-					"rolename":	"wer"
-				}],
-			"clients":	[]
-		}],
-	"roles":	[{
-			"rolename":	"admin",
-			"acls":	[{
-					"acltype":	"publishClientSend",
-					"topic":	"$CONTROL/dynamic-security/#",
-					"priority":	0,
-					"allow":	true
-				}]
-		}, {
-			"rolename":	"wer",
-			"acls":	[{
-					"acltype":	"publishClientSend",
-					"topic":	"fsd",
-					"priority":	0,
-					"allow":	true
-				}]
-		}]
+  "defaultACLAccess": {
+      "publishClientSend": true,
+      "publishClientReceive": true,
+      "subscribe": true,
+      "unsubscribe": true
+  },
+  "clients": [{
+          "connid": "ffU2",
+          "authtype": "jwt_es256",
+          "clientid": "new3",
+          "disabled": true,
+          "roles": [],
+          "jwtkey": "fdsf"
+      }, {
+          "connid": "ffU3",
+          "authtype": "jwt_es256",
+          "roles": [],
+          "jwtkey": "fdsf"
+      }, {
+          "connid": "ffU5",
+          "authtype": "password",
+          "username": "nf1",
+          "roles": [],
+          "password": {
+              "hash": "7deR8SuKFOat3vdYy5MChzONa6cqVplOYBQaKZctpjHUNborqUy3PSPg8S3JHXuBBjmM7UdyMY6ctFk0CH84Kg==",
+              "salt": "2NIBMdQ27wlG1iQ6",
+              "iterations": 101
+          }
+      }, {
+          "connid": "ffU6",
+          "authtype": "none",
+          "clientid": "nf1",
+          "roles": []
+      }, {
+          "connid": "ffU7",
+          "authtype": "none",
+          "username": "new1",
+          "roles": []
+      }, {
+    "connid": "test_jwt",
+    "authtype": "jwt_es256",
+    "username": "f_2",
+    "jwtkey": "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEEVs/o5+uQbTjL3chynL4wXgUg2R9q9UU8I5mEovUf86QZ7kOBIjJwqnzD1omageEHWwHdBO6B+dFabmdT9POxg==\n-----END PUBLIC KEY-----",
+    "roles": []
+  }],
+  "groups": [{
+          "groupname": "1",
+          "roles": [{
+                  "rolename": "wer"
+              }],
+          "clients": []
+      }],
+  "roles": [{
+          "rolename": "admin",
+          "acls": [{
+                  "acltype": "publishClientSend",
+                  "topic": "$CONTROL/dynamic-security/#",
+                  "priority": 0,
+                  "allow": true
+              }]
+      }, {
+          "rolename": "wer",
+          "acls": [{
+                  "acltype": "publishClientSend",
+                  "topic": "fsd",
+                  "priority": 0,
+                  "allow": true
+              }]
+  }]
 }
