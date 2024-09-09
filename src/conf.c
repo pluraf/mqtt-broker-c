@@ -69,6 +69,7 @@ static int conf__parse_ssize_t(char **token, const char *name, ssize_t *value, c
 static int conf__parse_string(char **token, const char *name, char **value, char *saveptr);
 static int config__read_file(struct mosquitto__config *config, bool reload, const char *file, struct config_recurse *config_tmp, int level, int *lineno);
 static int config__check(struct mosquitto__config *config);
+static int config__validate(struct mosquitto__config *config);
 static void config__cleanup_plugins(struct mosquitto__config *config);
 
 static void conf__set_cur_security_options(struct mosquitto__config *config, struct mosquitto__listener *cur_listener, struct mosquitto__security_options **security_options)
@@ -2319,6 +2320,18 @@ static int config__check(struct mosquitto__config *config)
 	return MOSQ_ERR_SUCCESS;
 }
 
+/* Handles validation of confuguration file. */
+static int config__validate(struct mosquitto__config *config)
+{	
+#ifdef WITH_TLS_PSK
+	if(strstr(config, "WITH_TLS:=yes") != NULL) {
+		return MOSQ_ERR_INVAL;
+	}
+#endif
+
+
+	return MOSQ_ERR_SUCCESS;
+}
 
 static int conf__parse_bool(char **token, const char *name, bool *value, char *saveptr)
 {
