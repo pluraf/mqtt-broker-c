@@ -824,9 +824,8 @@ int mosquitto_unpwd_check(struct mosquitto *context)
 		}
 	}else{
 		if(rc == MOSQ_ERR_PLUGIN_DEFER){
-			if(context->username == NULL &&
-					((db.config->per_listener_settings && context->listener->security_options.allow_anonymous != false)
-					|| (!db.config->per_listener_settings && db.config->security_options.allow_anonymous != false))){
+			if((db.config->per_listener_settings && context->listener->security_options.allow_anonymous != false)
+					|| (!db.config->per_listener_settings && db.config->security_options.allow_anonymous != false)){
 
 				return MOSQ_ERR_SUCCESS;
 			}else{
