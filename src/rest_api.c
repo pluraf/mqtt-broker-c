@@ -67,7 +67,7 @@ static int handler(struct mg_connection * conn, void * ignored)
         event_data.client = NULL;
         event_data.topic = topic;
         event_data.payload = buf;
-        event_data.payloadlen = strlen(buf);
+        event_data.payloadlen = strlen((char*)buf);
         event_data.qos = 0;
         event_data.retain = 0;
         event_data.properties = NULL;
@@ -94,7 +94,7 @@ int auth_handler(struct mg_connection * conn, void * cbdata)
 
     point_t *public_key = (point_t *)cbdata;
 
-    char * auth_token = mg_get_header(conn, "Authorization");  // TODO: Validate JWT Token
+    char const * auth_token = mg_get_header(conn, "Authorization");  // TODO: Validate JWT Token
     if(auth_token != NULL && strlen(auth_token) > 7){
         const char *token = auth_token + 7;  // skip prefix (Bearer)
 
@@ -125,10 +125,11 @@ struct mg_context * start_server()
 
     point_t *public_key = malloc(sizeof(point_t));
     public_key_from_pem(pem_public_key, public_key);
-    free(pem_public_key);
+    free((void*)pem_public_key);
 
     mg_init_library(0);
-    ctx = mg_start(NULL, 0, NULL);
+    char const * options[] = {"listening_ports", "8001", NULL};
+    ctx = mg_start(NULL, 0, options);
 
     mg_set_request_handler(ctx, "/command$", handler, NULL);
     mg_set_auth_handler(ctx, "/**", auth_handler, public_key);

@@ -84,7 +84,7 @@ char* jwt_create(char * project_id, long long int time, NN_DIGIT * priv_key, int
 }
 
 
-int jwt_verify(char * jwt,  point_t * pub_key)
+int jwt_verify(char const * jwt,  point_t * pub_key)
 {
     //ecc_init(); // TODO: Has to be initialized only once -> move to broker init phase
 

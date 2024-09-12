@@ -32,6 +32,6 @@ IN THE SOFTWARE.
 
 char * jwt_create(char *project_id, long long int time, NN_DIGIT * priv_key, int jwt_exp_secs);
 
-int jwt_verify(char * jwt,  point_t * pub_key);
+int jwt_verify(char const * jwt,  point_t * pub_key);
 
 #endif
