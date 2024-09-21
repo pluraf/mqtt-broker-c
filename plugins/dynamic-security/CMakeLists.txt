@@ -16,8 +16,8 @@ if (CJSON_FOUND AND WITH_TLS)
 	add_library(mosquitto_dynamic_security MODULE
 		acl.c
 		auth.c
-		clients.c
-		clientlist.c
+		channels.c
+		channellist.c
 		dynamic_security.h
 		groups.c
 		grouplist.c

@@ -200,7 +200,7 @@ static int acl_check_unsubscribe(struct mosquitto_evt_acl_check *ed, struct dyns
 
 static int acl_check(struct mosquitto_evt_acl_check *ed, MOSQ_FUNC_acl_check check, bool acl_default_access)
 {
-	struct dynsec__client *client;
+	struct dynsec__channel * channel;
 	struct dynsec__grouplist *grouplist, *grouplist_tmp = NULL;
 	const char * username;
 	const char * clientid;
@@ -211,13 +211,13 @@ static int acl_check(struct mosquitto_evt_acl_check *ed, MOSQ_FUNC_acl_check che
 
 	// First check connectors assigned to clientid or username
 	if(clientid || username){
-		client = dynsec_clients__find(clientid, username);
-		if(client != NULL){
-			rc = check(ed, client->rolelist);
+		channel = dynsec_channels__find(clientid, username);
+		if(channel != NULL){
+			rc = check(ed, channel->rolelist);
 			if(rc != MOSQ_ERR_NOT_FOUND){
 				return rc;
 			}
-			HASH_ITER(hh, client->grouplist, grouplist, grouplist_tmp){
+			HASH_ITER(hh, channel->grouplist, grouplist, grouplist_tmp){
 				rc = check(ed, grouplist->group->rolelist);
 				if(rc != MOSQ_ERR_NOT_FOUND){
 					return rc;
@@ -280,7 +280,7 @@ int dynsec__acl_check_callback(int event, void *event_data, void *userdata)
 		case MOSQ_ACL_UNSUBSCRIBE:
 			return acl_check(event_data, acl_check_unsubscribe, default_access.unsubscribe);
 			break;
-		case MOSQ_ACL_WRITE: /* Client to broker */
+		case MOSQ_ACL_WRITE: /* channel to broker */
 			return acl_check(event_data, acl_check_publish_c_send, default_access.publish_c_send);
 			break;
 		case MOSQ_ACL_READ:

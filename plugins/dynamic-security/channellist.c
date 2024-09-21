@@ -88,97 +88,97 @@ Contributors:
  * #
  * ################################################################ */
 
-static int dynsec_clientlist__cmp(void *a, void *b)
+static int dynsec_channellist__cmp(void *a, void *b)
 {
-	struct dynsec__clientlist *clientlist_a = a;
-	struct dynsec__clientlist *clientlist_b = b;
+	struct dynsec__channellist * channellist_a = a;
+	struct dynsec__channellist * channellist_b = b;
 
-	return strcmp(clientlist_a->client->connid, clientlist_b->client->connid);
+	return strcmp(channellist_a->channel->chanid, channellist_b->channel->chanid);
 }
 
 
-void dynsec_clientlist__kick_all(struct dynsec__clientlist *base_clientlist)
+void dynsec_channellist__kick_all(struct dynsec__channellist *base_channellist)
 {
-	struct dynsec__clientlist *clientlist, *clientlist_tmp;
+	struct dynsec__channellist * channellist, * channellist_tmp;
 
-	HASH_ITER(hh, base_clientlist, clientlist, clientlist_tmp){
-		if(clientlist->client->clientid){
-			mosquitto_kick_client_by_clientid(clientlist->client->clientid, false);
+	HASH_ITER(hh, base_channellist, channellist, channellist_tmp){
+		if(channellist->channel->clientid){
+			mosquitto_kick_client_by_clientid(channellist->channel->clientid, false);
 		}else{
-			mosquitto_kick_client_by_username(clientlist->client->username, false);
+			mosquitto_kick_client_by_username(channellist->channel->username, false);
 		}
 	}
 }
 
-cJSON *dynsec_clientlist__all_to_json(struct dynsec__clientlist *base_clientlist)
+cJSON *dynsec_channellist__all_to_json(struct dynsec__channellist *base_channellist)
 {
-	struct dynsec__clientlist *clientlist, *clientlist_tmp;
-	cJSON *j_clients, *j_client;
+	struct dynsec__channellist * channellist, * channellist_tmp;
+	cJSON *j_channels, *j_channel;
 
-	j_clients = cJSON_CreateArray();
-	if(j_clients == NULL) return NULL;
+	j_channels = cJSON_CreateArray();
+	if(j_channels == NULL) return NULL;
 
-	HASH_ITER(hh, base_clientlist, clientlist, clientlist_tmp){
-		j_client = cJSON_CreateObject();
-		if(j_client == NULL){
-			cJSON_Delete(j_clients);
+	HASH_ITER(hh, base_channellist, channellist, channellist_tmp){
+		j_channel = cJSON_CreateObject();
+		if(j_channel == NULL){
+			cJSON_Delete(j_channels);
 			return NULL;
 		}
-		cJSON_AddItemToArray(j_clients, j_client);
+		cJSON_AddItemToArray(j_channels, j_channel);
 
-		if(cJSON_AddStringToObject(j_client, "connid", clientlist->client->connid) == NULL
-				|| (clientlist->priority != -1 && cJSON_AddIntToObject(j_client, "priority", clientlist->priority) == NULL)
+		if(cJSON_AddStringToObject(j_channel, "chanid", channellist->channel->chanid) == NULL
+				|| (channellist->priority != -1 && cJSON_AddIntToObject(j_channel, "priority", channellist->priority) == NULL)
 				){
 
-			cJSON_Delete(j_clients);
+			cJSON_Delete(j_channels);
 			return NULL;
 		}
 	}
-	return j_clients;
+	return j_channels;
 }
 
 
-int dynsec_clientlist__add(struct dynsec__clientlist **base_clientlist, struct dynsec__client *client, int priority)
+int dynsec_channellist__add(struct dynsec__channellist **base_channellist, struct dynsec__channel * channel, int priority)
 {
-	struct dynsec__clientlist *clientlist;
+	struct dynsec__channellist * channellist;
 
-	HASH_FIND(hh, *base_clientlist, client->connid, strlen(client->connid), clientlist);
-	if(clientlist != NULL){
-		/* Client is already in the group */
+	HASH_FIND(hh, *base_channellist, channel->chanid, strlen(channel->chanid), channellist);
+	if(channellist != NULL){
+		/* channel is already in the group */
 		return MOSQ_ERR_SUCCESS;
 	}
 
-	clientlist = mosquitto_malloc(sizeof(struct dynsec__clientlist));
-	if(clientlist == NULL){
+	channellist = mosquitto_malloc(sizeof(struct dynsec__channellist));
+	if(channellist == NULL){
 		return MOSQ_ERR_NOMEM;
 	}
 
-	clientlist->client = client;
-	clientlist->priority = priority;
-	HASH_ADD_KEYPTR_INORDER(hh, *base_clientlist, client->connid, strlen(client->connid), clientlist, dynsec_clientlist__cmp);
+	channellist->channel = channel;
+	channellist->priority = priority;
+	HASH_ADD_KEYPTR_INORDER(hh, *base_channellist, channel->chanid, strlen(channel->chanid), channellist, dynsec_channellist__cmp);
 
 	return MOSQ_ERR_SUCCESS;
 }
 
 
-void dynsec_clientlist__cleanup(struct dynsec__clientlist **base_clientlist)
+void dynsec_channellist__cleanup(struct dynsec__channellist **base_channellist)
 {
-	struct dynsec__clientlist *clientlist, *clientlist_tmp;
+	struct dynsec__channellist * channellist, * channellist_tmp;
 
-	HASH_ITER(hh, *base_clientlist, clientlist, clientlist_tmp){
-		HASH_DELETE(hh, *base_clientlist, clientlist);
-		mosquitto_free(clientlist);
+	HASH_ITER(hh, *base_channellist, channellist, channellist_tmp){
+		HASH_DELETE(hh, *base_channellist, channellist);
+		mosquitto_free(channellist);
 	}
 }
 
 
-void dynsec_clientlist__remove(struct dynsec__clientlist **base_clientlist, struct dynsec__client *client)
+void dynsec_channellist__remove(struct dynsec__channellist **base_channellist, struct dynsec__channel * channel)
 {
-	struct dynsec__clientlist *clientlist;
+	struct dynsec__channellist * channellist;
 
-	HASH_FIND(hh, *base_clientlist, client->connid, strlen(client->connid), clientlist);
-	if(clientlist){
-		HASH_DELETE(hh, *base_clientlist, clientlist);
-		mosquitto_free(clientlist);
+	HASH_FIND(hh, *base_channellist, channel->chanid, strlen(channel->chanid), channellist);
+	if(channellist){
+		HASH_DELETE(hh, *base_channellist, channellist);
+		mosquitto_free(channellist);
 	}
 }

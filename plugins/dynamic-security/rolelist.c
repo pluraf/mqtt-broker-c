@@ -81,18 +81,18 @@ static int dynsec_rolelist__remove_role(struct dynsec__rolelist **base_rolelist,
 }
 
 
-int dynsec_rolelist__client_remove(struct dynsec__client *client, struct dynsec__role *role)
+int dynsec_rolelist__channel_remove(struct dynsec__channel * channel, struct dynsec__role *role)
 {
 	int rc;
-	struct dynsec__clientlist *found_clientlist;
+	struct dynsec__channellist *found_channellist;
 
-	rc = dynsec_rolelist__remove_role(&client->rolelist, role);
+	rc = dynsec_rolelist__remove_role(&channel->rolelist, role);
 	if(rc) return rc;
 
-	HASH_FIND(hh, role->clientlist, client->username, strlen(client->username), found_clientlist);
-	if(found_clientlist){
-		HASH_DELETE(hh, role->clientlist, found_clientlist);
-		mosquitto_free(found_clientlist);
+	HASH_FIND(hh, role->channellist, channel->username, strlen(channel->username), found_channellist);
+	if(found_channellist){
+		HASH_DELETE(hh, role->channellist, found_channellist);
+		mosquitto_free(found_channellist);
 		return MOSQ_ERR_SUCCESS;
 	}else{
 		return MOSQ_ERR_NOT_FOUND;
@@ -133,21 +133,21 @@ static int dynsec_rolelist__add(struct dynsec__rolelist **base_rolelist, struct 
 }
 
 
-int dynsec_rolelist__client_add(struct dynsec__client *client, struct dynsec__role *role, int priority)
+int dynsec_rolelist__channel_add(struct dynsec__channel * channel, struct dynsec__role *role, int priority)
 {
 	struct dynsec__rolelist *rolelist;
 	int rc;
 
-	rc = dynsec_rolelist__add(&client->rolelist, role, priority);
+	rc = dynsec_rolelist__add(&channel->rolelist, role, priority);
 	if(rc) return rc;
 
-	HASH_FIND(hh, client->rolelist, role->rolename, strlen(role->rolename), rolelist);
+	HASH_FIND(hh, channel->rolelist, role->rolename, strlen(role->rolename), rolelist);
 	if(rolelist == NULL){
 		/* This should never happen because the above add_role succeeded. */
 		return MOSQ_ERR_UNKNOWN;
 	}
 
-	return dynsec_clientlist__add(&role->clientlist, client, priority);
+	return dynsec_channellist__add(&role->channellist, channel, priority);
 }
 
 

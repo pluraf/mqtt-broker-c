@@ -82,7 +82,7 @@ static void role__free_item(struct dynsec__role *role, bool remove_from_hash)
 	if(remove_from_hash){
 		HASH_DEL(local_roles, role);
 	}
-	dynsec_clientlist__cleanup(&role->clientlist);
+	dynsec_channellist__cleanup(&role->channellist);
 	dynsec_grouplist__cleanup(&role->grouplist);
 	mosquitto_free(role->text_name);
 	mosquitto_free(role->text_description);
@@ -121,13 +121,13 @@ static void role__kick_all(struct dynsec__role *role)
 {
 	struct dynsec__grouplist *grouplist, *grouplist_tmp = NULL;
 
-	dynsec_clientlist__kick_all(role->clientlist);
+	dynsec_channellist__kick_all(role->channellist);
 
 	HASH_ITER(hh, role->grouplist, grouplist, grouplist_tmp){
 		if(grouplist->group == dynsec_anonymous_group){
 			mosquitto_kick_client_by_username(NULL, false);
 		}
-		dynsec_clientlist__kick_all(grouplist->group->clientlist);
+		dynsec_channellist__kick_all(grouplist->group->channellist);
 	}
 }
 
@@ -447,12 +447,12 @@ error:
 
 static void role__remove_all_clients(struct dynsec__role *role)
 {
-	struct dynsec__clientlist *clientlist, *clientlist_tmp = NULL;
+	struct dynsec__channellist * channellist, * channellist_tmp = NULL;
 
-	HASH_ITER(hh, role->clientlist, clientlist, clientlist_tmp){
-		mosquitto_kick_client_by_username(clientlist->client->username, false);
+	HASH_ITER(hh, role->channellist, channellist, channellist_tmp){
+		mosquitto_kick_client_by_username(channellist->channel->username, false);
 
-		dynsec_rolelist__client_remove(clientlist->client, role);
+		dynsec_rolelist__channel_remove(channellist->channel, role);
 	}
 }
 
@@ -464,7 +464,7 @@ static void role__remove_all_groups(struct dynsec__role *role)
 		if(grouplist->group == dynsec_anonymous_group){
 			mosquitto_kick_client_by_username(NULL, false);
 		}
-		dynsec_clientlist__kick_all(grouplist->group->clientlist);
+		dynsec_channellist__kick_all(grouplist->group->channellist);
 
 		dynsec_rolelist__group_remove(grouplist->group, role);
 	}

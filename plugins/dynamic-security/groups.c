@@ -102,7 +102,7 @@ static void group__kick_all(struct dynsec__group *group)
 	if(group == dynsec_anonymous_group){
 		mosquitto_kick_client_by_username(NULL, false);
 	}
-	dynsec_clientlist__kick_all(group->clientlist);
+	dynsec_channellist__kick_all(group->channellist);
 }
 
 
@@ -229,7 +229,7 @@ void dynsec_groups__cleanup(void)
 int dynsec_groups__config_load(cJSON *tree)
 {
 	cJSON *j_groups, *j_group;
-	cJSON *j_clientlist, *j_client;
+	cJSON *j_channellist, *j_channel;
 	cJSON *j_roles, *j_role;
 
 	struct dynsec__group *group;
@@ -314,16 +314,16 @@ int dynsec_groups__config_load(cJSON *tree)
 			/* This must go before clients are loaded, otherwise the group won't be found */
 			HASH_ADD_KEYPTR(hh, local_groups, group->groupname, strlen(group->groupname), group);
 
-			/* Clients */
-			j_clientlist = cJSON_GetObjectItem(j_group, "clients");
-			if(j_clientlist && cJSON_IsArray(j_clientlist)){
-				cJSON_ArrayForEach(j_client, j_clientlist){
-					if(cJSON_IsObject(j_client)){
-						char *connid;
-						if (json_get_string(j_client, "connid", &connid, false) == MOSQ_ERR_SUCCESS){
-							json_get_int(j_client, "priority", &priority, true, -1);
-							struct dynsec__client * client = dynsec_clients__get(connid);
-							if(client) dynsec_groups__add_client(client, group->groupname, priority, false);
+			/* Channels */
+			j_channellist = cJSON_GetObjectItem(j_group, "channels");
+			if(j_channellist && cJSON_IsArray(j_channellist)){
+				cJSON_ArrayForEach(j_channel, j_channellist){
+					if(cJSON_IsObject(j_channel)){
+						char *chanid;
+						if (json_get_string(j_channel, "chanid", &chanid, false) == MOSQ_ERR_SUCCESS){
+							json_get_int(j_channel, "priority", &priority, true, -1);
+							struct dynsec__channel * channel = dynsec_channels__get(chanid);
+							if(channel) dynsec_groups__add_client(channel, group->groupname, priority, false);
 						}
 					}
 				}
@@ -351,7 +351,7 @@ int dynsec_groups__config_load(cJSON *tree)
 static int dynsec__config_add_groups(cJSON *j_groups)
 {
 	struct dynsec__group *group, *group_tmp = NULL;
-	cJSON *j_group, *j_clients, *j_roles;
+	cJSON *j_group, *j_channels, *j_roles;
 
 	HASH_ITER(hh, local_groups, group, group_tmp){
 		j_group = cJSON_CreateObject();
@@ -372,11 +372,11 @@ static int dynsec__config_add_groups(cJSON *j_groups)
 		}
 		cJSON_AddItemToObject(j_group, "roles", j_roles);
 
-		j_clients = dynsec_clientlist__all_to_json(group->clientlist);
-		if(j_clients == NULL){
+		j_channels = dynsec_channellist__all_to_json(group->channellist);
+		if(j_channels == NULL){
 			return 1;
 		}
-		cJSON_AddItemToObject(j_group, "clients", j_clients);
+		cJSON_AddItemToObject(j_group, "channels", j_channels);
 	}
 
 	return 0;
@@ -534,13 +534,13 @@ int dynsec_groups__process_delete(cJSON *j_responses, struct mosquitto *context,
 }
 
 
-int dynsec_groups__add_client(struct dynsec__client * client, const char *groupname, int priority, bool update_config)
+int dynsec_groups__add_client(struct dynsec__channel * channel, const char *groupname, int priority, bool update_config)
 {
-	struct dynsec__clientlist *clientlist;
+	struct dynsec__channellist * channellist;
 	struct dynsec__group *group;
 	int rc;
 
-	if(client == NULL){
+	if(channel == NULL){
 		return ERR_USER_NOT_FOUND;
 	}
 
@@ -549,19 +549,19 @@ int dynsec_groups__add_client(struct dynsec__client * client, const char *groupn
 		return ERR_GROUP_NOT_FOUND;
 	}
 
-	HASH_FIND(hh, group->clientlist, client->connid, strlen(client->connid), clientlist);
-	if(clientlist != NULL){
-		/* Client is already in the group */
+	HASH_FIND(hh, group->channellist, channel->chanid, strlen(channel->chanid), channellist);
+	if(channellist != NULL){
+		/* channel is already in the group */
 		return MOSQ_ERR_ALREADY_EXISTS;
 	}
 
-	rc = dynsec_clientlist__add(&group->clientlist, client, priority);
+	rc = dynsec_channellist__add(&group->channellist, channel, priority);
 	if(rc){
 		return rc;
 	}
-	rc = dynsec_grouplist__add(&client->grouplist, group, priority);
+	rc = dynsec_grouplist__add(&channel->grouplist, group, priority);
 	if(rc){
-		dynsec_clientlist__remove(&group->clientlist, client);
+		dynsec_channellist__remove(&group->channellist, channel);
 		return rc;
 	}
 
@@ -573,59 +573,59 @@ int dynsec_groups__add_client(struct dynsec__client * client, const char *groupn
 }
 
 
-int dynsec_groups__process_add_client(cJSON *j_responses, struct mosquitto *context, cJSON *command, char *correlation_data)
+int dynsec_groups__process_add_channel(cJSON *j_responses, struct mosquitto *context, cJSON *command, char *correlation_data)
 {
-	char *connid, *groupname;
+	char *chanid, *groupname;
 	int rc;
 	int priority;
 	const char *admin_clientid, *admin_username;
 
-	if(json_get_string(command, "connid", &connid, false) != MOSQ_ERR_SUCCESS){
-		dynsec__command_reply(j_responses, context, "addGroupClient", "Invalid/missing connid", correlation_data);
+	if(json_get_string(command, "chanid", &chanid, false) != MOSQ_ERR_SUCCESS){
+		dynsec__command_reply(j_responses, context, "addGroupChannel", "Invalid/missing chanid", correlation_data);
 		return MOSQ_ERR_INVAL;
 	}
-	if(mosquitto_validate_utf8(connid, (int)strlen(connid)) != MOSQ_ERR_SUCCESS){
-		dynsec__command_reply(j_responses, context, "addGroupClient", "connid not valid UTF-8", correlation_data);
+	if(mosquitto_validate_utf8(chanid, (int)strlen(chanid)) != MOSQ_ERR_SUCCESS){
+		dynsec__command_reply(j_responses, context, "addGroupChannel", "chanid not valid UTF-8", correlation_data);
 		return MOSQ_ERR_INVAL;
 	}
 
 	if(json_get_string(command, "groupname", &groupname, false) != MOSQ_ERR_SUCCESS){
-		dynsec__command_reply(j_responses, context, "addGroupClient", "Invalid/missing groupname", correlation_data);
+		dynsec__command_reply(j_responses, context, "addGroupChannel", "Invalid/missing groupname", correlation_data);
 		return MOSQ_ERR_INVAL;
 	}
 	if(mosquitto_validate_utf8(groupname, (int)strlen(groupname)) != MOSQ_ERR_SUCCESS){
-		dynsec__command_reply(j_responses, context, "addGroupClient", "Group name not valid UTF-8", correlation_data);
+		dynsec__command_reply(j_responses, context, "addGroupChannel", "Group name not valid UTF-8", correlation_data);
 		return MOSQ_ERR_INVAL;
 	}
 
 	json_get_int(command, "priority", &priority, true, -1);
 
-	struct dynsec__client * client = dynsec_clients__get(connid);
-	if(client == NULL){
-		dynsec__command_reply(j_responses, context, "addGroupClient", "Client not found", correlation_data);
+	struct dynsec__channel * channel = dynsec_channels__get(chanid);
+	if(channel == NULL){
+		dynsec__command_reply(j_responses, context, "addGroupChannel", "Channel not found", correlation_data);
 	}else{
-		rc = dynsec_groups__add_client(client, groupname, priority, true);
+		rc = dynsec_groups__add_client(channel, groupname, priority, true);
 		if(rc == MOSQ_ERR_SUCCESS){
 			admin_clientid = mosquitto_client_id(context);
 			admin_username = mosquitto_client_username(context);
-			mosquitto_log_printf(MOSQ_LOG_INFO, "dynsec: %s/%s | addGroupClient | groupname=%s | connid=%s | priority=%d",
-					admin_clientid, admin_username, groupname, connid, priority);
+			mosquitto_log_printf(MOSQ_LOG_INFO, "dynsec: %s/%s | addGroupChannel | groupname=%s | chanid=%s | priority=%d",
+					admin_clientid, admin_username, groupname, chanid, priority);
 
-			dynsec__command_reply(j_responses, context, "addGroupClient", NULL, correlation_data);
+			dynsec__command_reply(j_responses, context, "addGroupChannel", NULL, correlation_data);
 		}else if(rc == ERR_GROUP_NOT_FOUND){
-			dynsec__command_reply(j_responses, context, "addGroupClient", "Group not found", correlation_data);
+			dynsec__command_reply(j_responses, context, "addGroupChannel", "Group not found", correlation_data);
 		}else if(rc == MOSQ_ERR_ALREADY_EXISTS){
-			dynsec__command_reply(j_responses, context, "addGroupClient", "Client is already in this group", correlation_data);
+			dynsec__command_reply(j_responses, context, "addGroupChannel", "Channel is already in this group", correlation_data);
 		}else{
-			dynsec__command_reply(j_responses, context, "addGroupClient", "Internal error", correlation_data);
+			dynsec__command_reply(j_responses, context, "addGroupChannel", "Internal error", correlation_data);
 		}
 	}
 
 	/* Enforce any changes */
-	if (client->clientid) {
-		mosquitto_kick_client_by_clientid(client->clientid, false);
+	if (channel->clientid) {
+		mosquitto_kick_client_by_clientid(channel->clientid, false);
 	}else{
-		mosquitto_kick_client_by_username(client->username, false);
+		mosquitto_kick_client_by_username(channel->username, false);
 	}
 
 	return rc;
@@ -634,14 +634,14 @@ int dynsec_groups__process_add_client(cJSON *j_responses, struct mosquitto *cont
 
 static int dynsec__remove_all_clients_from_group(struct dynsec__group *group)
 {
-	struct dynsec__clientlist *clientlist, *clientlist_tmp = NULL;
+	struct dynsec__channellist * channellist, * channellist_tmp = NULL;
 
-	HASH_ITER(hh, group->clientlist, clientlist, clientlist_tmp){
-		/* Remove client stored group reference */
-		dynsec_grouplist__remove(&clientlist->client->grouplist, group);
+	HASH_ITER(hh, group->channellist, channellist, channellist_tmp){
+		/* Remove channel stored group reference */
+		dynsec_grouplist__remove(&channellist->channel->grouplist, group);
 
-		HASH_DELETE(hh, group->clientlist, clientlist);
-		mosquitto_free(clientlist);
+		HASH_DELETE(hh, group->channellist, channellist);
+		mosquitto_free(channellist);
 	}
 
 	return MOSQ_ERR_SUCCESS;
@@ -658,13 +658,13 @@ static int dynsec__remove_all_roles_from_group(struct dynsec__group *group)
 	return MOSQ_ERR_SUCCESS;
 }
 
-int dynsec_groups__remove_client(const char *connid, const char *groupname, bool update_config)
+int dynsec_groups__remove_client(const char *chanid, const char *groupname, bool update_config)
 {
-	struct dynsec__client *client;
+	struct dynsec__channel * channel;
 	struct dynsec__group *group;
 
-	client = dynsec_clients__get(connid);
-	if(client == NULL){
+	channel = dynsec_channels__get(chanid);
+	if(channel == NULL){
 		return ERR_USER_NOT_FOUND;
 	}
 
@@ -673,8 +673,8 @@ int dynsec_groups__remove_client(const char *connid, const char *groupname, bool
 		return ERR_GROUP_NOT_FOUND;
 	}
 
-	dynsec_clientlist__remove(&group->clientlist, client);
-	dynsec_grouplist__remove(&client->grouplist, group);
+	dynsec_channellist__remove(&group->channellist, channel);
+	dynsec_grouplist__remove(&channel->grouplist, group);
 
 	if(update_config){
 		dynsec__config_save();
@@ -684,46 +684,46 @@ int dynsec_groups__remove_client(const char *connid, const char *groupname, bool
 
 int dynsec_groups__process_remove_client(cJSON *j_responses, struct mosquitto *context, cJSON *command, char *correlation_data)
 {
-	char *connid, *groupname;
+	char *chanid, *groupname;
 	int rc;
 	const char *admin_clientid, *admin_username;
 
-	if(json_get_string(command, "connid", &connid, false) != MOSQ_ERR_SUCCESS){
-		dynsec__command_reply(j_responses, context, "removeGroupClient", "Invalid/missing connid", correlation_data);
+	if(json_get_string(command, "chanid", &chanid, false) != MOSQ_ERR_SUCCESS){
+		dynsec__command_reply(j_responses, context, "removeGroupChannel", "Invalid/missing chanid", correlation_data);
 		return MOSQ_ERR_INVAL;
 	}
-	if(mosquitto_validate_utf8(connid, (int)strlen(connid)) != MOSQ_ERR_SUCCESS){
-		dynsec__command_reply(j_responses, context, "removeGroupClient", "connid not valid UTF-8", correlation_data);
+	if(mosquitto_validate_utf8(chanid, (int)strlen(chanid)) != MOSQ_ERR_SUCCESS){
+		dynsec__command_reply(j_responses, context, "removeGroupChannel", "chanid not valid UTF-8", correlation_data);
 		return MOSQ_ERR_INVAL;
 	}
 
 	if(json_get_string(command, "groupname", &groupname, false) != MOSQ_ERR_SUCCESS){
-		dynsec__command_reply(j_responses, context, "removeGroupClient", "Invalid/missing groupname", correlation_data);
+		dynsec__command_reply(j_responses, context, "removeGroupChannel", "Invalid/missing groupname", correlation_data);
 		return MOSQ_ERR_INVAL;
 	}
 	if(mosquitto_validate_utf8(groupname, (int)strlen(groupname)) != MOSQ_ERR_SUCCESS){
-		dynsec__command_reply(j_responses, context, "removeGroupClient", "Group name not valid UTF-8", correlation_data);
+		dynsec__command_reply(j_responses, context, "removeGroupChannel", "Group name not valid UTF-8", correlation_data);
 		return MOSQ_ERR_INVAL;
 	}
 
-	rc = dynsec_groups__remove_client(connid, groupname, true);
+	rc = dynsec_groups__remove_client(chanid, groupname, true);
 	if(rc == MOSQ_ERR_SUCCESS){
 		admin_clientid = mosquitto_client_id(context);
 		admin_username = mosquitto_client_username(context);
-		mosquitto_log_printf(MOSQ_LOG_INFO, "dynsec: %s/%s | removeGroupClient | groupname=%s | connid=%s",
-				admin_clientid, admin_username, groupname, connid);
+		mosquitto_log_printf(MOSQ_LOG_INFO, "dynsec: %s/%s | removeGroupChannel | groupname=%s | chanid=%s",
+				admin_clientid, admin_username, groupname, chanid);
 
-		dynsec__command_reply(j_responses, context, "removeGroupClient", NULL, correlation_data);
+		dynsec__command_reply(j_responses, context, "removeGroupChannel", NULL, correlation_data);
 	}else if(rc == ERR_USER_NOT_FOUND){
-		dynsec__command_reply(j_responses, context, "removeGroupClient", "Client not found", correlation_data);
+		dynsec__command_reply(j_responses, context, "removeGroupChannel", "Channel not found", correlation_data);
 	}else if(rc == ERR_GROUP_NOT_FOUND){
-		dynsec__command_reply(j_responses, context, "removeGroupClient", "Group not found", correlation_data);
+		dynsec__command_reply(j_responses, context, "removeGroupChannel", "Group not found", correlation_data);
 	}else{
-		dynsec__command_reply(j_responses, context, "removeGroupClient", "Internal error", correlation_data);
+		dynsec__command_reply(j_responses, context, "removeGroupChannel", "Internal error", correlation_data);
 	}
 
 	/* Enforce any changes */
-	struct dynsec__client * conn = dynsec_clients__get(connid);
+	struct dynsec__channel * conn = dynsec_channels__get(chanid);
 	if (conn->clientid) {
 		mosquitto_kick_client_by_clientid(conn->clientid, false);
 	}else{
@@ -736,8 +736,8 @@ int dynsec_groups__process_remove_client(cJSON *j_responses, struct mosquitto *c
 
 static cJSON *add_group_to_json(struct dynsec__group *group)
 {
-	cJSON *j_group, *jtmp, *j_clientlist, *j_client, *j_rolelist;
-	struct dynsec__clientlist *clientlist, *clientlist_tmp = NULL;
+	cJSON *j_group, *jtmp, *j_channellist, *j_channel, *j_rolelist;
+	struct dynsec__channellist * channellist, * channellist_tmp = NULL;
 
 	j_group = cJSON_CreateObject();
 	if(j_group == NULL){
@@ -747,27 +747,27 @@ static cJSON *add_group_to_json(struct dynsec__group *group)
 	if(cJSON_AddStringToObject(j_group, "groupname", group->groupname) == NULL
 			|| (group->text_name && cJSON_AddStringToObject(j_group, "textname", group->text_name) == NULL)
 			|| (group->text_description && cJSON_AddStringToObject(j_group, "textdescription", group->text_description) == NULL)
-			|| (j_clientlist = cJSON_AddArrayToObject(j_group, "clients")) == NULL
+			|| (j_channellist = cJSON_AddArrayToObject(j_group, "channels")) == NULL
 			){
 
 		cJSON_Delete(j_group);
 		return NULL;
 	}
 
-	HASH_ITER(hh, group->clientlist, clientlist, clientlist_tmp){
-		j_client = cJSON_CreateObject();
-		if(j_client == NULL){
+	HASH_ITER(hh, group->channellist, channellist, channellist_tmp){
+		j_channel = cJSON_CreateObject();
+		if(j_channel == NULL){
 			cJSON_Delete(j_group);
 			return NULL;
 		}
-		cJSON_AddItemToArray(j_clientlist, j_client);
+		cJSON_AddItemToArray(j_channellist, j_channel);
 
-		jtmp = cJSON_CreateStringReference(clientlist->client->connid);
+		jtmp = cJSON_CreateStringReference(channellist->channel->chanid);
 		if(jtmp == NULL){
 			cJSON_Delete(j_group);
 			return NULL;
 		}
-		cJSON_AddItemToObject(j_client, "connid", jtmp);
+		cJSON_AddItemToObject(j_channel, "chanid", jtmp);
 	}
 
 	j_rolelist = dynsec_rolelist__all_to_json(group->rolelist);
@@ -970,14 +970,14 @@ int dynsec_groups__process_modify(cJSON *j_responses, struct mosquitto *context,
 {
 	char *groupname = NULL;
 	char *text_name = NULL, *text_description = NULL;
-	struct dynsec__client *client = NULL;
+	struct dynsec__channel * channel = NULL;
 	struct dynsec__group *group = NULL;
 	struct dynsec__rolelist *rolelist = NULL;
 	bool have_text_name = false, have_text_description = false, have_rolelist = false;
 	int rc;
 	int priority;
-	cJSON *j_client, *j_clients;
-	char *connid;
+	cJSON *j_channel, *j_channels;
+	char *chanid;
 	char *textname;
 	char *textdescription;
 	const char *admin_clientid, *admin_username;
@@ -1038,20 +1038,20 @@ int dynsec_groups__process_modify(cJSON *j_responses, struct mosquitto *context,
 		goto error;
 	}
 
-	j_clients = cJSON_GetObjectItem(command, "clients");
-	if(j_clients && cJSON_IsArray(j_clients)){
+	j_channels = cJSON_GetObjectItem(command, "channels");
+	if(j_channels && cJSON_IsArray(j_channels)){
 		/* Iterate over array to check clients are valid before proceeding */
-		cJSON_ArrayForEach(j_client, j_clients){
-			if(cJSON_IsObject(j_client)){
-				if(json_get_string(j_client, "connid", &connid, false) == MOSQ_ERR_SUCCESS){
-					client = dynsec_clients__get(connid);
-					if(client == NULL){
-						dynsec__command_reply(j_responses, context, "modifyGroup", "'clients' contains an object with a 'connid' that does not exist", correlation_data);
+		cJSON_ArrayForEach(j_channel, j_channels){
+			if(cJSON_IsObject(j_channel)){
+				if(json_get_string(j_channel, "chanid", &chanid, false) == MOSQ_ERR_SUCCESS){
+					channel = dynsec_channels__get(chanid);
+					if(channel == NULL){
+						dynsec__command_reply(j_responses, context, "modifyGroup", "'clients' contains an object with a 'chanid' that does not exist", correlation_data);
 						rc = MOSQ_ERR_INVAL;
 						goto error;
 					}
 				}else{
-					dynsec__command_reply(j_responses, context, "modifyGroup", "'clients' contains an object with an invalid 'connid'", correlation_data);
+					dynsec__command_reply(j_responses, context, "modifyGroup", "'clients' contains an object with an invalid 'chanid'", correlation_data);
 					rc = MOSQ_ERR_INVAL;
 					goto error;
 				}
@@ -1063,12 +1063,12 @@ int dynsec_groups__process_modify(cJSON *j_responses, struct mosquitto *context,
 		dynsec__remove_all_clients_from_group(group);
 
 		/* Now we can add the new clients to the group */
-		cJSON_ArrayForEach(j_client, j_clients){
-			if(cJSON_IsObject(j_client)){
-				if (json_get_string(j_client, "connid", &connid, false) == MOSQ_ERR_SUCCESS){
-					json_get_int(j_client, "priority", &priority, true, -1);
-					client = dynsec_clients__get(connid);
-					if(client) dynsec_groups__add_client(client, groupname, priority, false);
+		cJSON_ArrayForEach(j_channel, j_channels){
+			if(cJSON_IsObject(j_channel)){
+				if (json_get_string(j_channel, "chanid", &chanid, false) == MOSQ_ERR_SUCCESS){
+					json_get_int(j_channel, "priority", &priority, true, -1);
+					channel = dynsec_channels__get(chanid);
+					if(channel) dynsec_groups__add_client(channel, groupname, priority, false);
 				}
 			}
 		}

@@ -155,23 +155,23 @@ int dynsec_auth__base64_decode(char *in, unsigned char **decoded, int *decoded_l
  * #
  * ################################################################ */
 
-int dynsec_auth__pw_hash(struct dynsec__client *client, const char *password, unsigned char *password_hash, int password_hash_len, bool new_password)
+int dynsec_auth__pw_hash(struct dynsec__channel * channel, const char *password, unsigned char *password_hash, int password_hash_len, bool new_password)
 {
 	const EVP_MD *digest;
 	int iterations;
 
 	if(new_password){
-		if(RAND_bytes(client->pw.salt, sizeof(client->pw.salt)) != 1){
+		if(RAND_bytes(channel->pw.salt, sizeof(channel->pw.salt)) != 1){
 			return MOSQ_ERR_UNKNOWN;
 		}
 		iterations = PW_DEFAULT_ITERATIONS;
 	}else{
-		iterations = client->pw.iterations;
+		iterations = channel->pw.iterations;
 	}
 	if(iterations < 1){
 		return MOSQ_ERR_INVAL;
 	}
-	client->pw.iterations = iterations;
+	channel->pw.iterations = iterations;
 
 	digest = EVP_get_digestbyname("sha512");
 	if(!digest){
@@ -179,7 +179,7 @@ int dynsec_auth__pw_hash(struct dynsec__client *client, const char *password, un
 	}
 
 	return !PKCS5_PBKDF2_HMAC(password, (int)strlen(password),
-			client->pw.salt, sizeof(client->pw.salt), iterations,
+			channel->pw.salt, sizeof(channel->pw.salt), iterations,
 			digest, password_hash_len, password_hash);
 }
 
@@ -208,20 +208,20 @@ static int memcmp_const(const void *a, const void *b, size_t len)
  * #
  * ################################################################ */
 
-int dynsec_auth__authenticate(const struct dynsec__client * client, const struct mosquitto_evt_basic_auth *ed)
+int dynsec_auth__authenticate(const struct dynsec__channel * channel, const struct mosquitto_evt_basic_auth *ed)
 {
-	if(strcmp(client->authtype, MQTT_AUTH_PASSWORD) == 0){
+	if(strcmp(channel->authtype, MQTT_AUTH_PASSWORD) == 0){
 		unsigned char password_hash[64];  // For SHA512
-		if(client->pw.valid && dynsec_auth__pw_hash(client, ed->password, password_hash, sizeof(password_hash), false) == MOSQ_ERR_SUCCESS){
-			if(memcmp_const(client->pw.password_hash, password_hash, sizeof(password_hash)) == 0){
+		if(channel->pw.valid && dynsec_auth__pw_hash(channel, ed->password, password_hash, sizeof(password_hash), false) == MOSQ_ERR_SUCCESS){
+			if(memcmp_const(channel->pw.password_hash, password_hash, sizeof(password_hash)) == 0){
 				return MOSQ_ERR_SUCCESS;
 			}else{
 				return MOSQ_ERR_AUTH;
 			}
 		}
-	}else if(strcmp(client->authtype, MQTT_AUTH_JWT_ES256) == 0){
+	}else if(strcmp(channel->authtype, MQTT_AUTH_JWT_ES256) == 0){
 		point_t key;
-		int rc = public_key_from_pem(client->jwtkey, &key);
+		int rc = public_key_from_pem(channel->jwtkey, &key);
 		if(rc != 0){
 			mosquitto_log_printf(MOSQ_LOG_WARNING, "Can't load public key");
 			return MOSQ_ERR_AUTH;
@@ -240,7 +240,7 @@ int dynsec_auth__authenticate(const struct dynsec__client * client, const struct
 int dynsec_auth__basic_auth_callback(int event, void *event_data, void *userdata)
 {
 	struct mosquitto_evt_basic_auth *ed = event_data;
-	struct dynsec__client *client;
+	struct dynsec__channel * channel;
 	const char * clientid;
 	const char * authtype;
 
@@ -250,11 +250,11 @@ int dynsec_auth__basic_auth_callback(int event, void *event_data, void *userdata
 	if(ed->username == NULL && ed->password == NULL) return MOSQ_ERR_PLUGIN_DEFER;
 
 	clientid = mosquitto_client_id(ed->client);
-	client = dynsec_clients__find(clientid, ed->username);
+	channel = dynsec_channels__find(clientid, ed->username);
 
-	if(client){
-		if(client->disabled) return MOSQ_ERR_AUTH;
-		return dynsec_auth__authenticate(client, ed);
+	if(channel){
+		if(channel->disabled) return MOSQ_ERR_AUTH;
+		return dynsec_auth__authenticate(channel, ed);
 	}
 
 	return MOSQ_ERR_PLUGIN_DEFER;

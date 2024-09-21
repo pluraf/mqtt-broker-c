@@ -431,7 +431,7 @@ static int dynsec__process_get_default_acl_access(cJSON *j_responses, struct mos
 		goto internal_error;
 	}
 
-	/* publishClientSend */
+	/* publishChannelSend */
 	j_acl = cJSON_CreateObject();
 	if(j_acl == NULL){
 		goto internal_error;
@@ -444,7 +444,7 @@ static int dynsec__process_get_default_acl_access(cJSON *j_responses, struct mos
 		goto internal_error;
 	}
 
-	/* publishClientReceive */
+	/* publishChannelReceive */
 	j_acl = cJSON_CreateObject();
 	if(j_acl == NULL){
 		goto internal_error;
@@ -606,7 +606,7 @@ static int dynsec__config_load(void)
 
 	if(dynsec__general_config_load(tree)
 			|| dynsec_roles__config_load(tree)
-			|| dynsec_clients__config_load(tree)
+			|| dynsec_channels__config_load(tree)
 			|| dynsec_groups__config_load(tree)
 			){
 
@@ -632,7 +632,7 @@ void dynsec__config_save(void)
 	if(tree == NULL) return;
 
 	if(dynsec__general_config_save(tree)
-			|| dynsec_clients__config_save(tree)
+			|| dynsec_channels__config_save(tree)
 			|| dynsec_groups__config_save(tree)
 			|| dynsec_roles__config_save(tree)){
 
@@ -757,7 +757,7 @@ int mosquitto_plugin_cleanup(void *user_data, struct mosquitto_opt *options, int
 		mosquitto_callback_unregister(plg_id, MOSQ_EVT_ACL_CHECK, dynsec__acl_check_callback, NULL);
 	}
 	dynsec_groups__cleanup();
-	dynsec_clients__cleanup();
+	dynsec_channels__cleanup();
 	dynsec_roles__cleanup();
 
 	mosquitto_free(config_file);
@@ -792,33 +792,33 @@ int dynsec__handle_control(cJSON *j_responses, struct mosquitto *context, cJSON 
 				}else if(!strcasecmp(command, "getDefaultACLAccess")){
 					rc = dynsec__process_get_default_acl_access(j_responses, context, aiter, correlation_data);
 
-				/* Clients */
-				}else if(!strcasecmp(command, "createClient")){
-					rc = dynsec_clients__process_create(j_responses, context, aiter, correlation_data);
-				}else if(!strcasecmp(command, "deleteConnectors")){
-					rc = dynsec_clients__process_delete(j_responses, context, aiter, correlation_data);
-				}else if(!strcasecmp(command, "getClient")){
-					rc = dynsec_clients__process_get(j_responses, context, aiter, correlation_data);
-				}else if(!strcasecmp(command, "listClients")){
-					rc = dynsec_clients__process_list(j_responses, context, aiter, correlation_data);
-				}else if(!strcasecmp(command, "modifyClient")){
-					rc = dynsec_clients__process_modify(j_responses, context, aiter, correlation_data);
-				}else if(!strcasecmp(command, "setClientPassword")){
-					rc = dynsec_clients__process_set_password(j_responses, context, aiter, correlation_data);
-				}else if(!strcasecmp(command, "setClientId")){
-					rc = dynsec_clients__process_set_id(j_responses, context, aiter, correlation_data);
-				}else if(!strcasecmp(command, "addClientRole")){
-					rc = dynsec_clients__process_add_role(j_responses, context, aiter, correlation_data);
-				}else if(!strcasecmp(command, "removeClientRole")){
-					rc = dynsec_clients__process_remove_role(j_responses, context, aiter, correlation_data);
-				}else if(!strcasecmp(command, "enableClient")){
-					rc = dynsec_clients__process_enable(j_responses, context, aiter, correlation_data);
-				}else if(!strcasecmp(command, "disableClient")){
-					rc = dynsec_clients__process_disable(j_responses, context, aiter, correlation_data);
+				/* Channels */
+				}else if(!strcasecmp(command, "createChannel")){
+					rc = dynsec_channels__process_create(j_responses, context, aiter, correlation_data);
+				}else if(!strcasecmp(command, "deleteChannels")){
+					rc = dynsec_channels__process_delete(j_responses, context, aiter, correlation_data);
+				}else if(!strcasecmp(command, "getChannel")){
+					rc = dynsec_channels__process_get(j_responses, context, aiter, correlation_data);
+				}else if(!strcasecmp(command, "listChannels")){
+					rc = dynsec_channels__process_list(j_responses, context, aiter, correlation_data);
+				}else if(!strcasecmp(command, "modifyChannel")){
+					rc = dynsec_channels__process_modify(j_responses, context, aiter, correlation_data);
+				}else if(!strcasecmp(command, "setChannelPassword")){
+					rc = dynsec_channels__process_set_password(j_responses, context, aiter, correlation_data);
+				}else if(!strcasecmp(command, "setChannelId")){
+					rc = dynsec_channels__process_set_id(j_responses, context, aiter, correlation_data);
+				}else if(!strcasecmp(command, "addChannelRole")){
+					rc = dynsec_channels__process_add_role(j_responses, context, aiter, correlation_data);
+				}else if(!strcasecmp(command, "removeChannelRole")){
+					rc = dynsec_channels__process_remove_role(j_responses, context, aiter, correlation_data);
+				}else if(!strcasecmp(command, "enableChannel")){
+					rc = dynsec_channels__process_enable(j_responses, context, aiter, correlation_data);
+				}else if(!strcasecmp(command, "disableChannel")){
+					rc = dynsec_channels__process_disable(j_responses, context, aiter, correlation_data);
 
 				/* Groups */
-				}else if(!strcasecmp(command, "addGroupClient")){
-					rc = dynsec_groups__process_add_client(j_responses, context, aiter, correlation_data);
+				}else if(!strcasecmp(command, "addGroupChannel")){
+					rc = dynsec_groups__process_add_channel(j_responses, context, aiter, correlation_data);
 				}else if(!strcasecmp(command, "createGroup")){
 					rc = dynsec_groups__process_create(j_responses, context, aiter, correlation_data);
 				}else if(!strcasecmp(command, "deleteGroup")){
@@ -829,7 +829,7 @@ int dynsec__handle_control(cJSON *j_responses, struct mosquitto *context, cJSON 
 					rc = dynsec_groups__process_list(j_responses, context, aiter, correlation_data);
 				}else if(!strcasecmp(command, "modifyGroup")){
 					rc = dynsec_groups__process_modify(j_responses, context, aiter, correlation_data);
-				}else if(!strcasecmp(command, "removeGroupClient")){
+				}else if(!strcasecmp(command, "removeGroupChannel")){
 					rc = dynsec_groups__process_remove_client(j_responses, context, aiter, correlation_data);
 				}else if(!strcasecmp(command, "addGroupRole")){
 					rc = dynsec_groups__process_add_role(j_responses, context, aiter, correlation_data);
