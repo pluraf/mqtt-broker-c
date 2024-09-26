@@ -2402,3 +2402,69 @@ static int conf__parse_string(char **token, const char *name, char **value, char
 	}
 	return MOSQ_ERR_SUCCESS;
 }
+
+int config__write(struct mosquitto__config *config, const char *file_path) {
+	FILE *file = fopen(file_path, "r");
+	if(file == NULL){
+		mosquitto_log_printf(MOSQ_LOG_ERR, "Could not open config file!");
+		return 1;
+	}
+
+	FILE *temp_file = tmpfile();
+	if(temp_file == NULL){
+		fclose(file);
+		mosquitto_log_printf(MOSQ_LOG_ERR, "Could not create temporary file!");
+		return 1;
+	}
+
+	char line[256];
+	// NOTE: config files with lines longer than 255 symbols are not supported
+	// lines longer than 255 symbols will be splited into several lines
+
+	const char *new_global_line = config->security_options.allow_anonymous 
+									? "allow_anonymous true\n" : "allow_anonymous false\n";
+
+	bool listener_local = false;
+	int astr_len = strlen("allow_anonymous");
+	while(fgets(line, sizeof(line), file)){
+		if(strstr(line, "listener") != NULL){
+			listener_local = strstr(line, "127.0.0.1") != NULL 
+								|| strstr(line, "localhost") != NULL;
+		}else if(!listener_local && strncmp(line, "allow_anonymous", astr_len) == 0){
+			fputs(new_global_line, temp_file);
+			continue;
+		}
+		fputs(line, temp_file);
+	}
+
+	fclose(file);
+	rewind(temp_file);
+
+	file = fopen(file_path, "w");
+	if(file == NULL){
+		mosquitto_log_printf(MOSQ_LOG_ERR, "Could not reopen config file!");
+		fclose(temp_file);
+		return 1;
+	}
+
+	while(fgets(line, sizeof(line), temp_file)) {
+		fputs(line, file);
+	}
+
+	fclose(file);
+	fclose(temp_file);
+
+	return 0;
+}
+
+void update_allow_anonymous(struct mosquitto__config *config, bool allow) {
+	if(config->per_listener_settings){
+		for(int i = 0; i < config->listener_count; i++){
+			if(strcmp(config->listeners[i].host, "127.0.0.1") != 0 
+				&& strcmp(config->listeners[i].host, "localhost") != 0){
+					config->listeners[i].security_options.allow_anonymous = allow;
+			}
+		}
+	}
+	config->security_options.allow_anonymous = allow;
+}
