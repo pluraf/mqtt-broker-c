@@ -130,7 +130,7 @@ static void config__init_reload(struct mosquitto__config *config)
 		mosquitto__free(config->listeners[i].security_options.psk_file);
 		config->listeners[i].security_options.psk_file = NULL;
 
-		config->listeners[i].security_options.allow_anonymous = -1;
+		config->listeners[i].security_options.allow_anonymous = false;
 		config->listeners[i].security_options.allow_zero_length_clientid = true;
 		config->listeners[i].security_options.auto_id_prefix = NULL;
 		config->listeners[i].security_options.auto_id_prefix_len = 0;
@@ -142,7 +142,7 @@ static void config__init_reload(struct mosquitto__config *config)
 	mosquitto__free(config->security_options.acl_file);
 	config->security_options.acl_file = NULL;
 
-	config->security_options.allow_anonymous = -1;
+	config->security_options.allow_anonymous = false;
 	config->security_options.allow_zero_length_clientid = true;
 	config->security_options.auto_id_prefix = NULL;
 	config->security_options.auto_id_prefix_len = 0;
@@ -638,19 +638,6 @@ int config__read(struct mosquitto__config *config, bool reload)
 	/* If auth/access options are set and allow_anonymous not explicitly set, disallow anon. */
 	if(config->local_only == true){
 		config->security_options.allow_anonymous = true;
-	}else{
-		if(config->per_listener_settings){
-			for(i=0; i<config->listener_count; i++){
-				/* Default option if no security options set */
-				if(config->listeners[i].security_options.allow_anonymous == -1){
-					config->listeners[i].security_options.allow_anonymous = false;
-				}
-			}
-		}else{
-			if(config->security_options.allow_anonymous == -1){
-				config->security_options.allow_anonymous = false;
-			}
-		}
 	}
 #ifdef WITH_PERSISTENCE
 	if(config->persistence){
@@ -2421,14 +2408,14 @@ int config__write(struct mosquitto__config *config, const char *file_path) {
 	// NOTE: config files with lines longer than 255 symbols are not supported
 	// lines longer than 255 symbols will be splited into several lines
 
-	const char *new_global_line = config->security_options.allow_anonymous 
+	const char *new_global_line = config->security_options.allow_anonymous
 									? "allow_anonymous true\n" : "allow_anonymous false\n";
 
 	bool listener_local = false;
 	int astr_len = strlen("allow_anonymous");
 	while(fgets(line, sizeof(line), file)){
 		if(strstr(line, "listener") != NULL){
-			listener_local = strstr(line, "127.0.0.1") != NULL 
+			listener_local = strstr(line, "127.0.0.1") != NULL
 								|| strstr(line, "localhost") != NULL;
 		}else if(!listener_local && strncmp(line, "allow_anonymous", astr_len) == 0){
 			fputs(new_global_line, temp_file);
@@ -2460,7 +2447,7 @@ int config__write(struct mosquitto__config *config, const char *file_path) {
 void update_allow_anonymous(struct mosquitto__config *config, bool allow) {
 	if(config->per_listener_settings){
 		for(int i = 0; i < config->listener_count; i++){
-			if(strcmp(config->listeners[i].host, "127.0.0.1") != 0 
+			if(strcmp(config->listeners[i].host, "127.0.0.1") != 0
 				&& strcmp(config->listeners[i].host, "localhost") != 0){
 					config->listeners[i].security_options.allow_anonymous = allow;
 			}

@@ -184,7 +184,7 @@ static void mosquitto__daemonise(void)
 
 void listener__set_defaults(struct mosquitto__listener *listener)
 {
-	listener->security_options.allow_anonymous = -1;
+	listener->security_options.allow_anonymous = false;
 	listener->security_options.allow_zero_length_clientid = true;
 	listener->protocol = mp_mqtt;
 	listener->max_connections = -1;
