@@ -1810,19 +1810,6 @@ static int config__read_file_core(struct mosquitto__config *config, bool reload,
 				}else if(!strcmp(token, "pid_file")){
 					if(reload) continue; /* pid file not valid for reloading. */
 					if(conf__parse_string(&token, "pid_file", &config->pid_file, saveptr)) return MOSQ_ERR_INVAL;
-				}else if(!strcmp(token, "port")){
-					log__printf(NULL, MOSQ_LOG_NOTICE, "The 'port' option is now deprecated and will be removed in a future version. Please use 'listener' instead.");
-					config->local_only = false;
-					if(reload) continue; /* Listeners not valid for reloading. */
-					if(config->default_listener.port){
-						log__printf(NULL, MOSQ_LOG_WARNING, "Warning: Default listener port specified multiple times. Only the latest will be used.");
-					}
-					if(conf__parse_int(&token, "port", &tmp_int, saveptr)) return MOSQ_ERR_INVAL;
-					if(tmp_int < 1 || tmp_int > UINT16_MAX){
-						log__printf(NULL, MOSQ_LOG_ERR, "Error: Invalid port value (%d).", tmp_int);
-						return MOSQ_ERR_INVAL;
-					}
-					config->default_listener.port = (uint16_t)tmp_int;
 				}else if(!strcmp(token, "protocol")){
 					token = strtok_r(NULL, " ", &saveptr);
 					if(token){
