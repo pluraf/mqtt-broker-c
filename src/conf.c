@@ -1762,12 +1762,6 @@ static int config__read_file_core(struct mosquitto__config *config, bool reload,
 						cur_security_options->password_file = NULL;
 					}
 					if(conf__parse_string(&token, "password_file", &cur_security_options->password_file, saveptr)) return MOSQ_ERR_INVAL;
-				}else if(!strcmp(token, "per_listener_settings")){
-					if(conf__parse_bool(&token, "per_listener_settings", &config->per_listener_settings, saveptr)) return MOSQ_ERR_INVAL;
-					if(cur_security_options && config->per_listener_settings){
-						log__printf(NULL, MOSQ_LOG_ERR, "Error: per_listener_settings must be set before any other security settings.");
-						return MOSQ_ERR_INVAL;
-					}
 				}else if(!strcmp(token, "persistence") || !strcmp(token, "retained_persistence")){
 					if(conf__parse_bool(&token, token, &config->persistence, saveptr)) return MOSQ_ERR_INVAL;
 				}else if(!strcmp(token, "persistence_file")){
