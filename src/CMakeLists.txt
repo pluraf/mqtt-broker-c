@@ -144,8 +144,7 @@ option(WITH_ADNS
 	"Include ADNS support?" OFF)
 
 if (CMAKE_SYSTEM_NAME STREQUAL Linux)
-	option(WITH_SYSTEMD
-		"Include systemd support?" OFF)
+	option(WITH_SYSTEMD "Include systemd support?" ON)
 	if (WITH_SYSTEMD)
 		add_definitions("-DWITH_SYSTEMD")
 		find_library(SYSTEMD_LIBRARY systemd)
