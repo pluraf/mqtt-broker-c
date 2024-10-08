@@ -62,11 +62,9 @@ void * zmq_listener(void * arg){
         }
         if(num == 0){
             zmq_send(responder, &opts->allow_anonymous, 1, 0);
-            printf("send\n");
         }else{
             zmq_send(responder, NULL, 0, 0);
             opts->allow_anonymous = buffer[0];
-            printf("%d\n", opts->allow_anonymous);
         }
     }
     zmq_close(responder);
